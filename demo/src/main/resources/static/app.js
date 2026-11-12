@@ -55,11 +55,10 @@ function initMap() {
   // Центрирование на дельту Волги и Северный Каспий
   mapInstance = L.map("map").setView([45.2, 48.0], 7);
 
-  // Высокотехнологичная темная морская подложка CartoDB Dark Matter
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  // Высококонтрастная монохромная морская подложка OpenStreetMap (без API-ключей, стабильно)
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18,
-    subdomains: "abcd",
-    attribution: "© OpenStreetMap © CARTO | Ситуационный Центр ООПТ Каспий"
+    attribution: "© OpenStreetMap | Ситуационный Центр ООПТ Каспий"
   }).addTo(mapInstance);
 
   initSealMigrationLayer();
@@ -84,22 +83,21 @@ function initSealMigrationLayer() {
   ];
 
   const sealPolyline = L.polyline(sealPathCoords, {
-    color: "#00f2fe",
+    color: "#ffffff",
     weight: 3,
-    opacity: 0.9,
-    dashArray: "8, 8",
+    opacity: 0.95,
+    dashArray: "6, 6",
     lineJoin: "round"
   });
 
   sealPolyline.bindPopup(`
     <div class="tactical-popup">
-      <div class="tp-title" style="color: #00f2fe;">🦭 Миграционный коридор каспийского тюленя</div>
-      <div class="tp-sub">Pusa caspica • Красная книга РФ • МСОП (Endangered)</div>
-      <div style="font-size: 12px; line-height: 1.45; color: var(--text-secondary);">
-        <p style="margin: 0 0 6px 0;"><strong style="color: #fff;">Сезон:</strong> Октябрь — Декабрь</p>
-        <p style="margin: 0 0 6px 0;"><strong style="color: #fff;">Маршрут:</strong> Из глубоководного Среднего Каспия (Дербент) через о. Тюлений на ледовые поля Северного Каспия для размножения и линьки.</p>
-        <p style="margin: 0 0 6px 0;"><strong style="color: #f43f5e;">Угрозы:</strong> Браконьерские сети и скоростные байды на ВКМСК.</p>
-        <p style="margin: 0;"><strong style="color: #10b981;">Мониторинг:</strong> Акустический дозор буев DEV-TUL-05 и DEV-VKMSK-03.</p>
+      <div class="tp-title">🦭 Миграционный коридор тюленя</div>
+      <div class="tp-sub">Pusa caspica • Красная книга РФ</div>
+      <div style="font-size: 11px; line-height: 1.45; color: #a3a3a3; font-family: var(--font-mono);">
+        <p style="margin: 0 0 4px 0;"><strong style="color: #fff;">Сезон:</strong> Октябрь — Декабрь</p>
+        <p style="margin: 0 0 4px 0;"><strong style="color: #fff;">Маршрут:</strong> Средний Каспий ➔ о. Тюлений ➔ Северный Каспий (ледовые поля).</p>
+        <p style="margin: 0;"><strong style="color: #ffffff;">Защита:</strong> Дозор буев DEV-TUL-05 и DEV-VKMSK-03.</p>
       </div>
     </div>
   `);
@@ -111,12 +109,12 @@ function initSealMigrationLayer() {
     {
       coords: [44.50, 47.52],
       title: "🦭 Лежбище: Остров Тюлений",
-      desc: "Крупнейшее осеннее лежбище нерпы. Охраняется морским буем DEV-TUL-05."
+      desc: "Крупнейшее осеннее лежбище нерпы. Охраняется буем DEV-TUL-05."
     },
     {
       coords: [45.45, 47.95],
       title: "⚠️ Фарватер ВКМСК 145 км",
-      desc: "Опасная зона пересечения судового хода и миграционного пути тюленей. Высокий риск браконьерских сетей!"
+      desc: "Опасная зона пересечения судового хода и пути тюленей."
     }
   ];
 
@@ -124,12 +122,12 @@ function initSealMigrationLayer() {
     const sealMarker = L.marker(p.coords, {
       icon: L.divIcon({
         className: "seal-pin",
-        html: `<div style="background: rgba(14, 165, 233, 0.95); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; box-shadow: 0 0 10px #38bdf8;">🦭</div>`,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        html: `<div style="background: #ffffff; color: #000000; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 2px solid #000000; box-shadow: 0 0 8px rgba(255,255,255,0.7);">🦭</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       })
     });
-    sealMarker.bindPopup(`<strong>${p.title}</strong><br/><small>${p.desc}</small>`);
+    sealMarker.bindPopup(`<div class="tactical-popup"><div class="tp-title">${p.title}</div><div class="tp-sub">${p.desc}</div></div>`);
     sealLayerGroup.addLayer(sealMarker);
   });
 
@@ -151,35 +149,39 @@ function toggleSealMigrationLayer() {
   }
 }
 
-function getMarkerColor(status) {
-  if (status === "CRITICAL") return "#f43f5e";
-  if (status === "WARNING") return "#f59e0b";
-  return "#10b981";
-}
-
 function renderMapMarkers(stations) {
   if (!mapInstance || !window.L) return;
 
   stations.forEach(st => {
-    const color = getMarkerColor(st.status);
+    const isCrit = st.status === "CRITICAL";
+    const isWarn = st.status === "WARNING";
+    const ringClass = isCrit ? "sonar-ring-crit" : (isWarn ? "sonar-ring-warn" : "sonar-ring-ok");
+    const coreClass = isCrit ? "sonar-core-crit" : (isWarn ? "sonar-core-warn" : "sonar-core-ok");
+
     const customIcon = L.divIcon({
       className: "custom-sonar-pin",
       html: `
         <div class="sonar-marker-wrap">
-          <div class="sonar-ring" style="border-color: ${color}; box-shadow: 0 0 10px ${color};"></div>
-          <div class="sonar-core" style="background-color: ${color}; box-shadow: 0 0 10px ${color};"></div>
+          <div class="sonar-ring ${ringClass}"></div>
+          <div class="sonar-core ${coreClass}">${isCrit ? '!' : ''}</div>
         </div>
       `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
     });
+
+    const statusBadge = isCrit 
+      ? '<span style="background: #ffffff; color: #000000; font-weight: 800; padding: 2px 6px; border-radius: 3px; font-size: 10px;">ТРЕВОГА</span>' 
+      : (isWarn ? '<span style="background: #666666; color: #ffffff; font-weight: 700; padding: 2px 6px; border-radius: 3px; font-size: 10px;">ВНИМАНИЕ</span>' : '<span style="border: 1px solid #444; color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">НОРМА</span>');
 
     const popupContent = `
       <div class="tactical-popup">
-        <div class="tp-title">${st.name}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <div class="tp-title">${st.name}</div>
+          ${statusBadge}
+        </div>
         <div class="tp-sub">${st.territory}</div>
         <div class="tp-metrics">
-          <div class="tp-row"><span>Статус:</span><strong style="color: ${color}; font-weight: 700;">${st.status}</strong></div>
           <div class="tp-row"><span>Кислород O₂:</span><strong>${st.latestTelemetry?.dissolvedOxygenMgL != null ? st.latestTelemetry.dissolvedOxygenMgL + " мг/л" : "—"}</strong></div>
           <div class="tp-row"><span>Температура:</span><strong>${st.latestTelemetry?.temperatureC != null ? st.latestTelemetry.temperatureC + " °C" : "—"}</strong></div>
           <div class="tp-row"><span>Солёность:</span><strong>${st.latestTelemetry?.salinityPpt != null ? st.latestTelemetry.salinityPpt + " ‰" : "—"}</strong></div>
@@ -269,19 +271,26 @@ async function loadStationChart(stationId) {
           {
             label: "Кислород O₂ (мг/л)",
             data: o2Data,
-            borderColor: "#38bdf8",
-            backgroundColor: "rgba(56, 189, 248, 0.1)",
-            tension: 0.3,
+            borderColor: "#ffffff",
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
+            borderWidth: 2,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#000000",
+            pointRadius: 4,
+            tension: 0.25,
             fill: true,
             yAxisID: "y"
           },
           {
             label: "Температура (°C)",
             data: tempData,
-            borderColor: "#f59e0b",
+            borderColor: "#888888",
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointBackgroundColor: "#888888",
+            pointRadius: 3,
             backgroundColor: "transparent",
-            borderDash: [4, 4],
-            tension: 0.3,
+            tension: 0.25,
             yAxisID: "yTemp"
           }
         ]
@@ -290,20 +299,36 @@ async function loadStationChart(stationId) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: "#94a3b8", font: { size: 11 } } },
-          tooltip: { mode: "index", intersect: false }
+          legend: {
+            labels: {
+              color: "#cccccc",
+              font: { family: "'JetBrains Mono', monospace", size: 11 }
+            }
+          },
+          tooltip: {
+            backgroundColor: "#000000",
+            titleColor: "#ffffff",
+            bodyColor: "#cccccc",
+            borderColor: "#444444",
+            borderWidth: 1,
+            mode: "index",
+            intersect: false
+          }
         },
         scales: {
-          x: { ticks: { color: "#64748b" }, grid: { color: "#1e293b" } },
+          x: {
+            ticks: { color: "#888888", font: { family: "'JetBrains Mono', monospace" } },
+            grid: { color: "rgba(255, 255, 255, 0.08)" }
+          },
           y: {
-            title: { display: true, text: "Кислород (мг/л)", color: "#38bdf8" },
-            ticks: { color: "#38bdf8" },
-            grid: { color: "#1e293b" }
+            title: { display: true, text: "Кислород (мг/л)", color: "#ffffff", font: { family: "'JetBrains Mono', monospace" } },
+            ticks: { color: "#ffffff" },
+            grid: { color: "rgba(255, 255, 255, 0.08)" }
           },
           yTemp: {
             position: "right",
-            title: { display: true, text: "Темп. (°C)", color: "#f59e0b" },
-            ticks: { color: "#f59e0b" },
+            title: { display: true, text: "Темп. (°C)", color: "#888888", font: { family: "'JetBrains Mono', monospace" } },
+            ticks: { color: "#888888" },
             grid: { drawOnChartArea: false }
           }
         }
@@ -590,9 +615,9 @@ function initVisualizerCanvas() {
 }
 
 function drawIdleSpectrum(ctx, w, h) {
-  ctx.fillStyle = "#050811";
+  ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
   ctx.beginPath();
   ctx.moveTo(0, h / 2);
   ctx.lineTo(w, h / 2);
@@ -608,7 +633,7 @@ function startVisualizerCanvas() {
 
   let phase = 0;
   function animate() {
-    ctx.fillStyle = "rgba(5, 8, 17, 0.25)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
     ctx.fillRect(0, 0, w, h);
 
     const bars = 48;
@@ -622,8 +647,9 @@ function startVisualizerCanvas() {
       const y = h - barHeight - 4;
 
       const grad = ctx.createLinearGradient(0, y, 0, h);
-      grad.addColorStop(0, "#38bdf8");
-      grad.addColorStop(1, "#0284c7");
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(0.5, "#cccccc");
+      grad.addColorStop(1, "#444444");
 
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, barWidth, barHeight);
@@ -823,7 +849,11 @@ function displayAudioResult(data, audioUrl = null) {
   const resultBox = document.getElementById("audio-result");
   resultBox.classList.remove("hidden");
 
-  const badgeColor = data.threatLevel === "CRITICAL" ? "#ef4444" : (data.threatLevel === "HIGH" ? "#f59e0b" : "#10b981");
+  const isCrit = data.threatLevel === "CRITICAL";
+  const isHigh = data.threatLevel === "HIGH";
+  const badgeStyle = isCrit
+    ? "background: #ffffff; color: #000000; font-weight: 800; border: 1px solid #ffffff;"
+    : (isHigh ? "background: #777777; color: #ffffff; font-weight: 700;" : "background: transparent; color: #ffffff; border: 1px solid #444;");
 
   const classNamesRu = {
     "boat_engine": "🚤 Подвесной мотор лодки («Байда»)",
@@ -835,21 +865,21 @@ function displayAudioResult(data, audioUrl = null) {
 
   resultBox.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <strong style="font-size: 14px;">${escapeHtml(titleRu)}</strong>
-      <span style="background: ${badgeColor}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">
-        Угроза: ${data.threatLevel}
+      <strong style="font-size: 14px; color: #ffffff;">${escapeHtml(titleRu)}</strong>
+      <span style="${badgeStyle} padding: 3px 8px; border-radius: 3px; font-size: 11px; font-family: var(--font-mono);">
+        УГРОЗА: ${data.threatLevel}
       </span>
     </div>
     ${audioUrl ? `
-      <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.25); padding: 6px 12px; border-radius: 6px;">
-        <span style="font-size: 12px; color: #94a3b8;">🎧 Запись инцидента с гидрофона:</span>
+      <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #0a0a0a; border: 1px solid #222; padding: 6px 12px; border-radius: 4px;">
+        <span style="font-size: 11px; color: #888; font-family: var(--font-mono);">🎧 Запись инцидента с гидрофона:</span>
         <audio id="result-audio-player" controls src="${audioUrl}" style="height: 28px;"></audio>
       </div>
     ` : ''}
-    <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
-      Достоверность нейросети: <strong style="color: var(--text-main);">${Math.round(data.confidence * 100)}%</strong><br/>
-      Источник анализа: <span style="color: var(--accent-cyan);">${escapeHtml(data.analysisSource)}</span><br/>
-      ${data.alertGenerated ? `<span style="color: #ef4444; font-weight: bold;">🚨 Сформировано оперативное предупреждение инспекции на карте!</span>` : `<span style="color: #10b981;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
+    <div style="font-size: 12px; color: #888888; line-height: 1.5; font-family: var(--font-mono);">
+      Достоверность нейросети: <strong style="color: #ffffff;">${Math.round(data.confidence * 100)}%</strong><br/>
+      Источник анализа: <span style="color: #cccccc;">${escapeHtml(data.analysisSource)}</span><br/>
+      ${data.alertGenerated ? `<span style="color: #ffffff; font-weight: bold; background: #222; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 4px; border: 1px solid #555;">🚨 Сформировано оперативное предупреждение на карте</span>` : `<span style="color: #aaaaaa;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
     </div>
   `;
 }
@@ -867,24 +897,22 @@ async function loadForecast() {
     if (!res.ok) throw new Error("Ошибка получения прогноза");
     const data = await res.json();
 
-    const scoreColor = data.suitabilityIndex >= 70 ? "#10b981" : (data.suitabilityIndex >= 45 ? "#f59e0b" : "#ef4444");
-
     card.innerHTML = `
       <div class="forecast-gauge">
-        <div class="gauge-circle" style="color: ${scoreColor}; border: 3px solid ${scoreColor};">
+        <div class="gauge-circle">
           ${Math.round(data.suitabilityIndex)}%
         </div>
         <div class="gauge-details">
-          <strong style="color: ${scoreColor}; font-size: 14px;">${data.status}</strong>
-          <span style="font-size: 12px; color: #94a3b8;">Оптимальное окно нереста: <strong>${data.windowStart} — ${data.windowEnd}</strong></span>
-          <span style="font-size: 11px; color: #64748b;">Лимитирующий фактор: ${data.limitingFactor}</span>
+          <strong style="color: #ffffff; font-size: 14px; text-transform: uppercase;">${data.status}</strong>
+          <span style="font-size: 12px; color: #a3a3a3; font-family: var(--font-mono);">Оптимальное окно нереста: <strong style="color: #fff;">${data.windowStart} — ${data.windowEnd}</strong></span>
+          <span style="font-size: 11px; color: #666666; font-family: var(--font-mono);">Лимитирующий фактор: ${data.limitingFactor}</span>
         </div>
       </div>
       <div class="recommendation-box">
-        <strong>🛡️ Тактическая рекомендация инспекции:</strong><br/>
+        <strong>🛡️ ТАКТИЧЕСКАЯ РЕКОМЕНДАЦИЯ ИНСПЕКЦИИ:</strong><br/>
         ${data.patrolRecommendation}
       </div>
-      <div style="font-size: 10px; color: #64748b; text-align: right;">${data.modelVersion}</div>
+      <div style="font-size: 10px; color: #666666; text-align: right; font-family: var(--font-mono);">${data.modelVersion}</div>
     `;
   } catch (err) {
     console.error("loadForecast error:", err);

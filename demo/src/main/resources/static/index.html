@@ -156,13 +156,13 @@
           </div>
 
           <!-- Audio Player & Visualizer -->
-          <div class="live-stream-panel" style="border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(10, 15, 29, 0.9); padding: 12px; border-radius: 8px;">
-            <div class="stream-bar" style="margin-bottom: 8px;">
+          <div class="live-stream-panel">
+            <div class="stream-bar">
               <div class="stream-info">
-                <span style="font-weight: 700; font-size: 13px; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 700; font-size: 12px; color: #ffffff; display: flex; align-items: center; gap: 6px; font-family: var(--font-mono);">
                   <span>🔊</span> АУДИОПЛЕЕР:
                 </span>
-                <span class="stream-dev-name" id="stream-dev-title" style="color: var(--text-main); font-weight: 600; font-size: 13px;">
+                <span class="stream-dev-name" id="stream-dev-title" style="color: var(--text-secondary); font-weight: 500; font-size: 12px; font-family: var(--font-mono);">
                   Нажмите на любой звук выше для воспроизведения
                 </span>
               </div>
@@ -172,18 +172,18 @@
                 </button>
               </div>
             </div>
-            <canvas id="audio-spectrum-canvas" class="spectrum-canvas" width="600" height="38" style="margin-bottom: 8px; border-radius: 4px;"></canvas>
+            <canvas id="audio-spectrum-canvas" class="spectrum-canvas" width="600" height="38"></canvas>
             <audio id="device-audio-player" controls preload="auto" style="width: 100%; height: 36px;"></audio>
           </div>
 
           <!-- Custom File Upload -->
           <div class="aux-audio-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-            <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono);">
               📁 Загрузить свою гидроакустическую запись (.wav, .mp3)
             </div>
-            <div class="manual-upload-box" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+            <div class="manual-upload-box">
               <input type="file" id="audio-file-input" accept="audio/*" class="file-input" onchange="onAudioFileSelected(this)">
-              <select id="station-select-audio" style="padding: 6px 10px; font-size: 12px; background: rgba(15,23,42,0.9); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; color: #f1f5f9;">
+              <select id="station-select-audio">
                 <option value="1">Станция ВКМСК-145</option>
                 <option value="2">Дамчикский участок</option>
                 <option value="3">Трёхизбинка</option>
