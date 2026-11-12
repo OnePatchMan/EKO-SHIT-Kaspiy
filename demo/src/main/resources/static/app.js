@@ -10,6 +10,8 @@ let currentAlertFilterResolved = false;
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   refreshAllData();
+  loadRecordingDevices();
+  initVisualizerCanvas();
 
   // Auto-refresh interval (every 30 seconds)
   setInterval(() => {
@@ -259,11 +261,312 @@ function filterAlerts(resolved) {
 }
 
 // ==========================================
-// 5. Акустический модуль (Загрузка аудио)
+// 5. Модуль гидрофонов ООПТ и акустического ИИ
 // ==========================================
+let currentSelectedDeviceId = "DEV-CASP-03";
+let currentSoundScenario = "boat";
+let devicesCache = {};
+let visualizerAnimationId = null;
+let isStreamingAudio = false;
+let mediaRecorderInstance = null;
+let micAudioChunks = [];
+
+async function loadRecordingDevices() {
+  try {
+    const res = await fetch(`${API_BASE}/api/audio/devices`);
+    if (!res.ok) return;
+    const devices = await res.json();
+    devices.forEach(d => {
+      devicesCache[d.deviceId] = d;
+    });
+
+    const selectEl = document.getElementById("hydrophone-select");
+    if (selectEl && devices.length > 0) {
+      selectEl.innerHTML = devices.map(d => `
+        <option value="${d.deviceId}" ${d.deviceId === currentSelectedDeviceId ? 'selected' : ''}>
+          ${d.deviceId} — ${escapeHtml(d.name)}
+        </option>
+      `).join("");
+    }
+
+    updateDeviceTelemetryView(currentSelectedDeviceId);
+  } catch (err) {
+    console.error("Ошибка загрузки гидрофонов ООПТ:", err);
+  }
+}
+
+function onHydrophoneSelected(deviceId) {
+  currentSelectedDeviceId = deviceId;
+  updateDeviceTelemetryView(deviceId);
+
+  if (isStreamingAudio) {
+    const player = document.getElementById("device-audio-player");
+    player.src = `${API_BASE}/api/audio/devices/${deviceId}/stream?t=${Date.now()}`;
+    player.play().catch(e => console.log("Stream play interrupted"));
+  }
+}
+
+function updateDeviceTelemetryView(deviceId) {
+  const dev = devicesCache[deviceId];
+  if (!dev) return;
+
+  const statusEl = document.getElementById("dev-status");
+  const batteryEl = document.getElementById("dev-battery");
+  const signalEl = document.getElementById("dev-signal");
+  const modelEl = document.getElementById("dev-model");
+  const noiseEl = document.getElementById("dev-noise");
+  const btnSentry = document.getElementById("btn-toggle-sentry");
+  const streamTitle = document.getElementById("stream-dev-title");
+
+  if (statusEl) {
+    statusEl.innerHTML = dev.status === "ONLINE" 
+      ? `<span class="text-online">● ONLINE</span>` 
+      : `<span class="text-standby">○ STANDBY</span>`;
+  }
+  if (batteryEl) batteryEl.innerText = `🔋 ${dev.batteryLevel}%`;
+  if (signalEl) signalEl.innerText = `📶 ${dev.signalStrength}`;
+  if (modelEl) modelEl.innerText = dev.hydrophoneModel;
+  if (noiseEl) noiseEl.innerText = `🔊 ${dev.noiseFloorDb} дБ`;
+
+  if (btnSentry) {
+    btnSentry.innerText = dev.sentryActive ? "Сторож: ВКЛ" : "Сторож: ВЫКЛ";
+    btnSentry.classList.toggle("btn-primary", dev.sentryActive);
+    btnSentry.classList.toggle("btn-outline", !dev.sentryActive);
+  }
+
+  if (streamTitle) {
+    streamTitle.innerText = `${dev.name} (44.1 кГц, PCM 16-bit)`;
+  }
+}
+
+async function toggleDeviceSentry() {
+  try {
+    const res = await fetch(`${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/toggle-sentry`, {
+      method: "POST"
+    });
+    if (!res.ok) throw new Error("Не удалось переключить режим");
+    const updated = await res.json();
+    devicesCache[updated.deviceId] = updated;
+    updateDeviceTelemetryView(updated.deviceId);
+  } catch (err) {
+    alert("Ошибка переключения режима сторожа: " + err.message);
+  }
+}
+
+function setScenario(scen) {
+  currentSoundScenario = scen;
+  document.querySelectorAll(".btn-scen").forEach(b => b.classList.remove("active"));
+  const activeBtn = document.getElementById(`scen-${scen}`);
+  if (activeBtn) activeBtn.classList.add("active");
+}
+
+async function captureFromSelectedDevice() {
+  const resultBox = document.getElementById("audio-result");
+  const dev = devicesCache[currentSelectedDeviceId];
+  const devName = dev ? dev.name : currentSelectedDeviceId;
+
+  resultBox.classList.remove("hidden");
+  resultBox.innerHTML = `<div>⏳ Захват цифрового гидроакустического потока с <strong>${escapeHtml(devName)}</strong> и спектральный анализ ИИ...</div>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/capture?scenario=${currentSoundScenario}`, {
+      method: "POST"
+    });
+    if (!res.ok) throw new Error("Ошибка анализа гидроакустического сигнала");
+    const data = await res.json();
+
+    const streamUrl = `${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/stream?t=${Date.now()}`;
+    displayAudioResult(data, streamUrl);
+
+    // Auto-play the captured stream in the player
+    startDeviceAudioStream();
+
+    loadAlerts(currentAlertFilterResolved);
+    loadStations();
+  } catch (err) {
+    resultBox.innerHTML = `<div style="color: #ef4444;">Ошибка захвата потока: ${err.message}</div>`;
+  }
+}
+
+function toggleDeviceLiveStream() {
+  const player = document.getElementById("device-audio-player");
+  const btn = document.getElementById("btn-toggle-stream");
+
+  if (isStreamingAudio) {
+    player.pause();
+    isStreamingAudio = false;
+    btn.innerText = "▶ Слушать эфир гидрофона";
+    stopVisualizerCanvas();
+  } else {
+    startDeviceAudioStream();
+  }
+}
+
+function startDeviceAudioStream() {
+  const player = document.getElementById("device-audio-player");
+  const btn = document.getElementById("btn-toggle-stream");
+
+  player.src = `${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/stream?t=${Date.now()}`;
+  player.play().then(() => {
+    isStreamingAudio = true;
+    if (btn) btn.innerText = "⏹ Остановить эфир";
+    startVisualizerCanvas();
+  }).catch(e => {
+    console.log("Audio play allowed on user interaction:", e);
+  });
+
+  player.onended = () => {
+    isStreamingAudio = false;
+    if (btn) btn.innerText = "▶ Слушать эфир гидрофона";
+    stopVisualizerCanvas();
+  };
+}
+
+// Canvas spectrum visualizer
+function initVisualizerCanvas() {
+  const canvas = document.getElementById("audio-spectrum-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  drawIdleSpectrum(ctx, canvas.width, canvas.height);
+}
+
+function drawIdleSpectrum(ctx, w, h) {
+  ctx.fillStyle = "#050811";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+  ctx.beginPath();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.stroke();
+}
+
+function startVisualizerCanvas() {
+  const canvas = document.getElementById("audio-spectrum-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  let phase = 0;
+  function animate() {
+    ctx.fillStyle = "rgba(5, 8, 17, 0.25)";
+    ctx.fillRect(0, 0, w, h);
+
+    const bars = 48;
+    const barWidth = (w / bars) - 2;
+
+    for (let i = 0; i < bars; i++) {
+      const freq = Math.sin(phase + i * 0.3) * 0.5 + 0.5;
+      const noise = Math.random() * 0.4;
+      const barHeight = Math.max(4, (freq * 0.7 + noise * 0.3) * (h - 8));
+      const x = i * (barWidth + 2);
+      const y = h - barHeight - 4;
+
+      const grad = ctx.createLinearGradient(0, y, 0, h);
+      grad.addColorStop(0, "#38bdf8");
+      grad.addColorStop(1, "#0284c7");
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, barWidth, barHeight);
+    }
+
+    phase += 0.15;
+    if (isStreamingAudio) {
+      visualizerAnimationId = requestAnimationFrame(animate);
+    }
+  }
+
+  if (visualizerAnimationId) cancelAnimationFrame(visualizerAnimationId);
+  visualizerAnimationId = requestAnimationFrame(animate);
+}
+
+function stopVisualizerCanvas() {
+  if (visualizerAnimationId) {
+    cancelAnimationFrame(visualizerAnimationId);
+    visualizerAnimationId = null;
+  }
+  const canvas = document.getElementById("audio-spectrum-canvas");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    drawIdleSpectrum(ctx, canvas.width, canvas.height);
+  }
+}
+
+// Direct Microphone / Inspector Terminal Capture
+async function toggleMicRecording() {
+  const btn = document.getElementById("btn-mic-record");
+  const hint = document.getElementById("mic-status-hint");
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("Доступ к локальному микрофону не поддерживается вашим браузером. Используйте захват с гидрофона ООПТ.");
+    return;
+  }
+
+  try {
+    hint.innerText = "Подключение к полевому микрофону...";
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorderInstance = new MediaRecorder(stream);
+    micAudioChunks = [];
+
+    mediaRecorderInstance.ondataavailable = e => {
+      if (e.data.size > 0) micAudioChunks.push(e.data);
+    };
+
+    mediaRecorderInstance.onstop = async () => {
+      const audioBlob = new Blob(micAudioChunks, { type: "audio/wav" });
+      stream.getTracks().forEach(t => t.stop());
+      hint.innerText = "⏳ Отправка на анализ нейросетью...";
+
+      const formData = new FormData();
+      formData.append("file", audioBlob, "field_mic_capture.wav");
+      formData.append("stationId", "3");
+
+      try {
+        const res = await fetch(`${API_BASE}/api/audio/upload`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        const blobUrl = URL.createObjectURL(audioBlob);
+        displayAudioResult(data, blobUrl);
+        hint.innerText = "✓ Запись проанализирована";
+        btn.disabled = false;
+        btn.innerText = "🎙️ Захват с физического микрофона/терминала (3 сек)";
+        loadAlerts(currentAlertFilterResolved);
+        loadStations();
+      } catch (err) {
+        hint.innerText = "Ошибка: " + err.message;
+        btn.disabled = false;
+        btn.innerText = "🎙️ Захват с физического микрофона/терминала (3 сек)";
+      }
+    };
+
+    mediaRecorderInstance.start();
+    btn.disabled = true;
+
+    let timeLeft = 3;
+    hint.innerText = `🔴 Идёт запись звука: ${timeLeft} сек...`;
+    const interval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft > 0) {
+        hint.innerText = `🔴 Идёт запись звука: ${timeLeft} сек...`;
+      } else {
+        clearInterval(interval);
+        if (mediaRecorderInstance && mediaRecorderInstance.state === "recording") {
+          mediaRecorderInstance.stop();
+        }
+      }
+    }, 1000);
+
+  } catch (err) {
+    hint.innerText = "Микрофон недоступен: " + err.message;
+    console.warn("getUserMedia error:", err);
+  }
+}
+
+// Fallback file upload from disk
 async function uploadAudio() {
   const fileInput = document.getElementById("audio-file-input");
-  const stationId = document.getElementById("audio-station-select").value;
   const resultBox = document.getElementById("audio-result");
 
   if (!fileInput.files || fileInput.files.length === 0) {
@@ -273,7 +576,7 @@ async function uploadAudio() {
 
   const formData = new FormData();
   formData.append("file", fileInput.files[0]);
-  formData.append("stationId", stationId);
+  formData.append("stationId", "3");
 
   resultBox.classList.remove("hidden");
   resultBox.innerHTML = `<div>⏳ Выполняется нейросетевая спектрограмма и инференс аудиомодели...</div>`;
@@ -285,37 +588,8 @@ async function uploadAudio() {
     });
     if (!res.ok) throw new Error("Ошибка классификации аудио");
     const data = await res.json();
-    displayAudioResult(data);
-    loadAlerts(currentAlertFilterResolved);
-    loadStations();
-  } catch (err) {
-    resultBox.innerHTML = `<div style="color: #ef4444;">Ошибка анализа: ${err.message}</div>`;
-  }
-}
-
-async function simulateAudioTest(sampleName) {
-  const resultBox = document.getElementById("audio-result");
-  const stationId = document.getElementById("audio-station-select").value;
-
-  resultBox.classList.remove("hidden");
-  resultBox.innerHTML = `<div>⏳ Загрузка реального акустического сэмпла <strong>${sampleName}</strong>...</div>`;
-
-  try {
-    const audioUrl = `samples/${sampleName}`;
-    const audioResp = await fetch(audioUrl);
-    const audioBlob = await audioResp.blob();
-    const file = new File([audioBlob], sampleName, { type: "audio/wav" });
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("stationId", stationId);
-
-    const res = await fetch(`${API_BASE}/api/audio/upload`, {
-      method: "POST",
-      body: formData
-    });
-    const data = await res.json();
-    displayAudioResult(data, audioUrl);
+    const localUrl = URL.createObjectURL(fileInput.files[0]);
+    displayAudioResult(data, localUrl);
     loadAlerts(currentAlertFilterResolved);
     loadStations();
   } catch (err) {
@@ -329,10 +603,18 @@ function displayAudioResult(data, audioUrl = null) {
 
   const badgeColor = data.threatLevel === "CRITICAL" ? "#ef4444" : (data.threatLevel === "HIGH" ? "#f59e0b" : "#10b981");
 
+  const classNamesRu = {
+    "boat_engine": "🚤 Подвесной мотор лодки («Байда»)",
+    "gunfire": "💥 Оружейный выстрел браконьера",
+    "fish_splash": "🐟 Плеск рыбы / Нерестовый ход",
+    "ambient_noise": "🌊 Фоновый шум Каспийского моря"
+  };
+  const titleRu = classNamesRu[data.detectedClass] || data.detectedClass;
+
   resultBox.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <strong>Вердикт модели: ${escapeHtml(data.detectedClass)}</strong>
-      <span style="background: ${badgeColor}; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">
+      <strong style="font-size: 14px;">${escapeHtml(titleRu)}</strong>
+      <span style="background: ${badgeColor}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">
         Угроза: ${data.threatLevel}
       </span>
     </div>
@@ -341,10 +623,10 @@ function displayAudioResult(data, audioUrl = null) {
         <audio controls src="${audioUrl}" style="width: 100%; height: 32px;"></audio>
       </div>
     ` : ''}
-    <div style="font-size: 12px; color: #94a3b8; line-height: 1.4;">
-      Достоверность ИИ: <strong>${Math.round(data.confidence * 100)}%</strong><br/>
-      Источник анализа: ${data.analysisSource}<br/>
-      ${data.alertGenerated ? `<span style="color: #ef4444; font-weight: bold;">🚨 Сформировано оперативное предупреждение на карте!</span>` : `Экологическая угроза не обнаружена.`}
+    <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+      Достоверность нейросети: <strong style="color: var(--text-main);">${Math.round(data.confidence * 100)}%</strong><br/>
+      Источник анализа: <span style="color: var(--accent-cyan);">${escapeHtml(data.analysisSource)}</span><br/>
+      ${data.alertGenerated ? `<span style="color: #ef4444; font-weight: bold;">🚨 Сформировано оперативное предупреждение инспекции на карте!</span>` : `<span style="color: #10b981;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
     </div>
   `;
 }

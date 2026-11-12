@@ -37,6 +37,9 @@ class ControllerAndExceptionTests {
     @Autowired
     private SystemStatusController systemStatusController;
 
+    @Autowired
+    private AudioAnalysisController audioAnalysisController;
+
     private final GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
     @Test
@@ -167,5 +170,46 @@ class ControllerAndExceptionTests {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals(500, response.getBody().get("status"));
     }
+
+    @Test
+    @DisplayName("Контроллер Audio: GET /api/audio/devices возвращает список устройств ООПТ")
+    void testAudioControllerGetDevices() {
+        ResponseEntity<List<RecordingDeviceDto>> response = audioAnalysisController.getRecordingDevices();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().size() >= 5);
+        assertTrue(response.getBody().stream().anyMatch(d -> d.deviceId().equals("DEV-CASP-03")));
+    }
+
+    @Test
+    @DisplayName("Контроллер Audio: GET /api/audio/devices/{deviceId} возвращает параметры комплекса")
+    void testAudioControllerGetDeviceById() {
+        ResponseEntity<RecordingDeviceDto> response = audioAnalysisController.getDeviceById("DEV-DAM-01");
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("DEV-DAM-01", response.getBody().deviceId());
+        assertEquals("Гидроакустический комплекс ГАК-Дамчик-1", response.getBody().name());
+    }
+
+    @Test
+    @DisplayName("Контроллер Audio: POST /api/audio/devices/{id}/capture прямой захват и анализ угрозы")
+    void testAudioControllerCaptureFromDevice() {
+        ResponseEntity<AudioAnalysisResponse> response = audioAnalysisController.captureFromDevice("DEV-DAM-01", "boat");
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("boat_engine", response.getBody().detectedClass());
+        assertTrue(response.getBody().alertGenerated());
+    }
+
+    @Test
+    @DisplayName("Контроллер Audio: POST /api/audio/devices/{id}/toggle-sentry переключение режима сторожа")
+    void testAudioControllerToggleSentry() {
+        ResponseEntity<RecordingDeviceDto> response = audioAnalysisController.toggleSentry("DEV-AGR-04");
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse(response.getBody().sentryActive());
+        assertEquals("STANDBY", response.getBody().status());
+    }
 }
+
 

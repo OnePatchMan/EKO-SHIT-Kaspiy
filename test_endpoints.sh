@@ -65,9 +65,16 @@ check_endpoint "PATCH" "/api/alerts/1/resolve" "Квитирование але�
 # 9. Spawning Forecast
 check_endpoint "GET" "/api/forecast/spawning" "Прогноз нереста осетровых"
 
-# 10. Audio Upload
+# 10. Hydrophone Devices & Stream Capture
+check_endpoint "GET" "/api/audio/devices" "Реестр регистрирующих комплексов ООПТ"
+check_endpoint "GET" "/api/audio/devices/DEV-CASP-03" "Телеметрия комплекса DEV-CASP-03"
+check_endpoint "POST" "/api/audio/devices/DEV-CASP-03/capture?scenario=boat" "Прямой захват и анализ аудио с гидрофона" ""
+check_endpoint "GET" "/api/audio/devices/DEV-CASP-03/stream" "Слушать прямой аудиопоток с буя"
+check_endpoint "POST" "/api/audio/devices/DEV-CASP-03/toggle-sentry" "Переключение режима сторожа гидрофона" ""
+
+# 11. Audio Upload (Field Terminal)
 echo "test sound bytes" > /tmp/test_boat.wav
-echo -n "Проверка: Загрузка аудио с буя [POST /api/audio/upload]... "
+echo -n "Проверка: Загрузка аудио с полевого терминала [POST /api/audio/upload]... "
 STATUS=$(curl -s -o /tmp/resp.json -w "%{http_code}" -X POST "$BASE_URL/api/audio/upload" \
     -F "file=@/tmp/test_boat.wav" -F "stationId=3")
 if [[ "$STATUS" =~ ^2 ]]; then
