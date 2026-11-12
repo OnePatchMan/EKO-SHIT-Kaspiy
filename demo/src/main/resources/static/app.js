@@ -220,11 +220,7 @@ async function loadStations() {
     document.getElementById("stat-stations").innerText = stations.length;
     renderMapMarkers(stations);
 
-    // Update station dropdowns
-    const selector = document.getElementById("station-selector");
-    if (selector.options.length <= 1) {
-      selector.innerHTML = stations.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
-    }
+    for (const id of ['station-selector', 'station-select-audio', 'forecast-station-select']) updateStationSelect(stations, id);
   } catch (err) {
     console.error("loadStations error:", err);
   }
@@ -413,7 +409,7 @@ let isStreamingAudio = false;
 const SCENARIO_AUDIO_MAP = {
   boat: {
     file: "samples/boat_engine_outboard.wav",
-    title: "🚤 Мотор лодки («Байда»)",
+    title: "🚤 Образец звука мотора",
     deviceId: "DEV-CASP-03"
   },
   shot: {
@@ -423,7 +419,7 @@ const SCENARIO_AUDIO_MAP = {
   },
   splash: {
     file: "samples/sturgeon_water_splash.wav",
-    title: "🐟 Плеск рыбы / Нерестовый ход",
+    title: "🐟 Образец звука всплеска",
     deviceId: "DEV-TRE-02"
   },
   ambient: {
@@ -471,53 +467,36 @@ async function playAndAnalyzeSound(scenario) {
     const res = await fetch(`${API_BASE}/api/audio/devices/${item.deviceId}/capture?scenario=${encodeURIComponent(scenario)}`, {
       method: "POST"
     });
-    if (!res.ok) throw new Error("Ошибка анализа аудиосигнала");
+    await requireAiResponse(res);
     const data = await res.json();
 
     displayAudioResult(data, soundUrl);
     loadAlerts(currentAlertFilterResolved);
     loadStations();
   } catch (err) {
-    // Автономный фолбэк-классификатор, если бэкенд ещё не запущен
-    const fallbackData = getLocalAiClassification(scenario);
-    displayAudioResult(fallbackData, soundUrl);
+    resultBox.textContent = 'Анализ недоступен: ' + err.message;
   }
 }
-
-function getLocalAiClassification(scenario) {
-  if (scenario === "boat") {
-    return {
-      detectedClass: "boat_engine",
-      confidence: 0.94,
-      threatLevel: "HIGH",
-      analysisSource: "Акустическая нейросеть (Автономная детекция)",
-      alertGenerated: true
-    };
-  } else if (scenario === "shot") {
-    return {
-      detectedClass: "gunfire",
-      confidence: 0.89,
-      threatLevel: "CRITICAL",
-      analysisSource: "Акустическая нейросеть (Автономная детекция)",
-      alertGenerated: true
-    };
-  } else if (scenario === "splash") {
-    return {
-      detectedClass: "fish_splash",
-      confidence: 0.92,
-      threatLevel: "LOW",
-      analysisSource: "Гидроакустический классификатор био-активности",
-      alertGenerated: false
-    };
-  } else {
-    return {
-      detectedClass: "ambient_noise",
-      confidence: 0.96,
-      threatLevel: "NONE",
-      analysisSource: "Гидроакустический спектральный анализатор",
-      alertGenerated: false
-    };
+async function requireAiResponse(res) {
+  if (res.ok) return;
+  let error;
+  try { error = await res.json(); } catch (_) {}
+  const message = error?.message || error?.detail || error?.error || ('HTTP ' + res.status);
+  throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+}
+function encodePcmWav(buffer) {
+  const bytes = new ArrayBuffer(44 + buffer.length * 2), view = new DataView(bytes);
+  const write = (o, t) => { for (let i=0;i<t.length;i++) view.setUint8(o+i,t.charCodeAt(i)); };
+  write(0,'RIFF'); view.setUint32(4,36+buffer.length*2,true); write(8,'WAVE'); write(12,'fmt ');
+  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true);
+  view.setUint32(24,buffer.sampleRate,true); view.setUint32(28,buffer.sampleRate*2,true);
+  view.setUint16(32,2,true); view.setUint16(34,16,true); write(36,'data'); view.setUint32(40,buffer.length*2,true);
+  const channels = Array.from({length:buffer.numberOfChannels},(_,i)=>buffer.getChannelData(i));
+  for(let i=0;i<buffer.length;i++) {
+    const sample = Math.max(-1,Math.min(1,channels.reduce((sum,c)=>sum+c[i],0)/channels.length));
+    view.setInt16(44+i*2,sample<0?sample*32768:sample*32767,true);
   }
+  return new Blob([bytes],{type:'audio/wav'});
 }
 
 function playAudioStreamUrl(url, titleText = "") {
@@ -698,19 +677,24 @@ async function toggleMicRecording() {
     };
 
     mediaRecorderInstance.onstop = async () => {
-      const audioBlob = new Blob(micAudioChunks, { type: "audio/wav" });
+      const recordedBlob = new Blob(micAudioChunks, { type: mediaRecorderInstance.mimeType });
       stream.getTracks().forEach(t => t.stop());
       hint.innerText = "⏳ Отправка на анализ нейросетью...";
 
-      const formData = new FormData();
-      formData.append("file", audioBlob, "field_mic_capture.wav");
-      formData.append("stationId", "3");
-
       try {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        const context = new Context();
+        let audioBlob;
+        try { audioBlob = encodePcmWav(await context.decodeAudioData(await recordedBlob.arrayBuffer())); }
+        finally { await context.close(); }
+        const formData = new FormData();
+        formData.append('file',audioBlob,'field_mic_capture.wav');
+        formData.append('stationId',document.getElementById('station-select-audio').value);
         const res = await fetch(`${API_BASE}/api/audio/upload`, {
           method: "POST",
           body: formData
         });
+        await requireAiResponse(res);
         const data = await res.json();
         const blobUrl = URL.createObjectURL(audioBlob);
         displayAudioResult(data, blobUrl);
@@ -820,8 +804,15 @@ async function uploadAudio() {
   const stationId = stationSelect ? stationSelect.value : "1";
 
   const file = fileInput.files[0];
+  const header = new Uint8Array(await file.slice(0,12).arrayBuffer());
+  const tag = (a,b) => String.fromCharCode(...header.slice(a,b));
+  if (!/\.wav$/i.test(file.name) || tag(0,4)!=='RIFF' || tag(8,12)!=='WAVE') {
+    resultBox.classList.remove('hidden');
+    resultBox.textContent = 'Требуется настоящий WAV (RIFF/WAVE). Экспортируйте запись в WAV; переименование MP3 не меняет формат.';
+    return;
+  }
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append('file',file);
   formData.append("stationId", stationId);
 
   resultBox.classList.remove("hidden");
@@ -832,7 +823,7 @@ async function uploadAudio() {
       method: "POST",
       body: formData
     });
-    if (!res.ok) throw new Error("Ошибка классификации аудио");
+    await requireAiResponse(res);
     const data = await res.json();
     const localUrl = URL.createObjectURL(file);
 
@@ -841,7 +832,7 @@ async function uploadAudio() {
     loadAlerts(currentAlertFilterResolved);
     loadStations();
   } catch (err) {
-    resultBox.innerHTML = `<div style="color: #ef4444;">Ошибка анализа: ${err.message}</div>`;
+    resultBox.innerHTML = `<div style="color: #ef4444;">Ошибка анализа: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -856,10 +847,9 @@ function displayAudioResult(data, audioUrl = null) {
     : (isHigh ? "background: #777777; color: #ffffff; font-weight: 700;" : "background: transparent; color: #ffffff; border: 1px solid #444;");
 
   const classNamesRu = {
-    "boat_engine": "🚤 Подвесной мотор лодки («Байда»)",
-    "gunfire": "💥 Оружейный выстрел браконьера",
-    "fish_splash": "🐟 Плеск рыбы / Нерестовый ход",
-    "ambient_noise": "🌊 Фоновый шум Каспийского моря"
+    boat_suspected: 'Возможный звук лодки', gunshot_suspected: 'Возможный импульсный звук / выстрел',
+    engine_detected: 'Звук двигателя (тип не определён)', uncertain: 'Неопределённый результат',
+    no_target_event: 'Целевое событие не обнаружено в записи'
   };
   const titleRu = classNamesRu[data.detectedClass] || data.detectedClass;
 
@@ -867,7 +857,7 @@ function displayAudioResult(data, audioUrl = null) {
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <strong style="font-size: 14px; color: #ffffff;">${escapeHtml(titleRu)}</strong>
       <span style="${badgeStyle} padding: 3px 8px; border-radius: 3px; font-size: 11px; font-family: var(--font-mono);">
-        УГРОЗА: ${data.threatLevel}
+        ПРОВЕРКА: ${escapeHtml(data.threatLevel === "REVIEW" ? "ТРЕБУЕТ ОЦЕНКИ ИНСПЕКТОРА" : data.threatLevel)}
       </span>
     </div>
     ${audioUrl ? `
@@ -877,47 +867,31 @@ function displayAudioResult(data, audioUrl = null) {
       </div>
     ` : ''}
     <div style="font-size: 12px; color: #888888; line-height: 1.5; font-family: var(--font-mono);">
-      Достоверность нейросети: <strong style="color: #ffffff;">${Math.round(data.confidence * 100)}%</strong><br/>
+      Оценка модели (не вероятность): <strong style="color: #ffffff;">${Number.isFinite(data.confidence) ? data.confidence.toFixed(3) : "нет данных"}</strong><br/>
+      Модель: ${escapeHtml(data.analysisDetails?.model_version || "не указана")}<br/>
+      События / интервалы: ${escapeHtml(JSON.stringify(data.analysisDetails?.events || []))}<br/>
       Источник анализа: <span style="color: #cccccc;">${escapeHtml(data.analysisSource)}</span><br/>
-      ${data.alertGenerated ? `<span style="color: #ffffff; font-weight: bold; background: #222; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 4px; border: 1px solid #555;">🚨 Сформировано оперативное предупреждение на карте</span>` : `<span style="color: #aaaaaa;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
+      ${data.alertGenerated ? `<span style="color: #ffffff; font-weight: bold; background: #222; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 4px; border: 1px solid #555;">🚨 Сформировано оперативное предупреждение на карте</span>` : `<span style="color: #aaaaaa;">Автоматическое предупреждение не сформировано; требуется оценка инспектора.</span>`}
     </div>
   `;
 }
 
 // ==========================================
-// 6. Прогноз нереста осетровых
+// 6. Внешний демонстрационный сценарий условий
 // ==========================================
 async function loadForecast() {
-  const species = document.getElementById("species-select").value;
-  const stationId = document.getElementById("forecast-station-select").value;
-  const card = document.getElementById("forecast-card");
-
+  const species = document.getElementById('species-select').value;
+  const stationId = document.getElementById('forecast-station-select').value;
+  const card = document.getElementById('forecast-card');
+  card.textContent = 'Запрос сценария условий...';
   try {
-    const res = await fetch(`${API_BASE}/api/forecast/spawning?species=${encodeURIComponent(species)}&stationId=${stationId}`);
-    if (!res.ok) throw new Error("Ошибка получения прогноза");
-    const data = await res.json();
-
-    card.innerHTML = `
-      <div class="forecast-gauge">
-        <div class="gauge-circle">
-          ${Math.round(data.suitabilityIndex)}%
-        </div>
-        <div class="gauge-details">
-          <strong style="color: #ffffff; font-size: 14px; text-transform: uppercase;">${data.status}</strong>
-          <span style="font-size: 12px; color: #a3a3a3; font-family: var(--font-mono);">Оптимальное окно нереста: <strong style="color: #fff;">${data.windowStart} — ${data.windowEnd}</strong></span>
-          <span style="font-size: 11px; color: #666666; font-family: var(--font-mono);">Лимитирующий фактор: ${data.limitingFactor}</span>
-        </div>
-      </div>
-      <div class="recommendation-box">
-        <strong>🛡️ ТАКТИЧЕСКАЯ РЕКОМЕНДАЦИЯ ИНСПЕКЦИИ:</strong><br/>
-        ${data.patrolRecommendation}
-      </div>
-      <div style="font-size: 10px; color: #666666; text-align: right; font-family: var(--font-mono);">${data.modelVersion}</div>
-    `;
-  } catch (err) {
-    console.error("loadForecast error:", err);
-    card.innerHTML = `<div class="loading-placeholder">Ошибка расчета прогноза.</div>`;
-  }
+    const res = await fetch(API_BASE + '/api/forecast/spawning?species=' + encodeURIComponent(species) + '&stationId=' + stationId);
+    await requireAiResponse(res);
+    const data = await res.json(), d = data.forecastDetails || {};
+    const list = values => (values || []).map(v => '<li>' + escapeHtml(typeof v === 'string' ? v : JSON.stringify(v)) + '</li>').join('');
+    const rows = (d.trajectory || []).map(r => '<tr><td>'+escapeHtml(r.timestamp)+'</td><td>'+escapeHtml(r.temperature_c ?? 'нет данных')+'</td><td>'+escapeHtml(r.water_level_m ?? 'нет данных')+'</td><td>'+escapeHtml(r.conditions)+'</td></tr>').join('');
+    card.innerHTML = '<div class="gauge-details"><strong>Сценарий условий для сазана / карпа — демонстрация</strong><span>Режим: '+escapeHtml(d.mode)+' · Валидация: '+escapeHtml(d.validation_status)+'</span><span>Будущее окно: '+escapeHtml(d.valid_from)+' — '+escapeHtml(d.valid_to)+'</span><span>Источник: '+escapeHtml(d.data_source)+' · Модель: '+escapeHtml(data.modelVersion)+'</span><span>Вероятность фактического нереста не рассчитана.</span></div><table style="width:100%;font-size:12px"><thead><tr><th>Время</th><th>Температура °C</th><th>Уровень м</th><th>Условия</th></tr></thead><tbody>'+rows+'</tbody></table><div class="recommendation-box"><strong>Факторы:</strong><ul>'+list(d.factors)+'</ul><strong>Недостающие данные:</strong><ul>'+list(d.missing_data)+'</ul><strong>Ограничения:</strong><ul>'+list(d.warnings)+'</ul></div>';
+  } catch (err) { card.textContent = 'Сценарий недоступен: '+err.message; }
 }
 
 // ==========================================
@@ -1004,7 +978,22 @@ function refreshAllData() {
 }
 
 function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+
+function updateStationSelect(stations, selectorId) {
+  const select = document.getElementById(selectorId);
+  if (!select) return;
+  const previous = select.value;
+  const options = stations.map(station => {
+    const option = document.createElement('option');
+    option.value = String(station.id);
+    option.textContent = station.name;
+    return option;
+  });
+  select.replaceChildren(...options);
+  select.disabled = stations.length === 0;
+  if (stations.some(station => String(station.id) === previous)) select.value = previous;
+}

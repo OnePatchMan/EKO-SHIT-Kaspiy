@@ -9,6 +9,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.List;
 
 @Component
@@ -16,6 +18,10 @@ public class DataInitializer implements CommandLineRunner {
 
     private final StationRepository stationRepository;
     private final WaterTelemetryRepository telemetryRepository;
+
+    // Synthetic demo history, not verified field observations.
+    @Value("${ecoshield.telemetry-zone:Europe/Moscow}")
+    private String telemetryZone = "Europe/Moscow";
     private final AlertRepository alertRepository;
     private final AudioRecordRepository audioRecordRepository;
 
@@ -84,13 +90,13 @@ public class DataInitializer implements CommandLineRunner {
         List<Station> stations = stationRepository.saveAll(List.of(s1, s2, s3, s4, s5));
 
         // 2. Generating Historical Water Telemetry for each station
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of(telemetryZone));
 
         // Station 1: Damchik - autumn hydrology + localized hypoxia event
         for (int h = 12; h >= 1; h--) {
             telemetryRepository.save(new WaterTelemetry(
                 s1,
-                now.minusHours(h * 2L),
+                now.minusHours(h * 8L),
                 7.4 + (h * 0.05),
                 0.28,
                 9.1 + (h * 0.08),
@@ -128,7 +134,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int h = 8; h >= 0; h--) {
             telemetryRepository.save(new WaterTelemetry(
                 s2,
-                now.minusHours(h * 3L),
+                now.minusHours(h * 6L),
                 7.1 + (h * 0.04),
                 0.24,
                 9.7 - (h * 0.03),
@@ -143,7 +149,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int h = 8; h >= 0; h--) {
             telemetryRepository.save(new WaterTelemetry(
                 s3,
-                now.minusHours(h * 3L),
+                now.minusHours(h * 6L),
                 8.4 + (h * 0.03),
                 3.8,
                 9.6,
@@ -158,7 +164,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int h = 6; h >= 0; h--) {
             telemetryRepository.save(new WaterTelemetry(
                 s4,
-                now.minusHours(h * 4L),
+                now.minusHours(h * 8L),
                 9.1,
                 1.65,
                 9.0,
@@ -173,7 +179,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int h = 6; h >= 0; h--) {
             telemetryRepository.save(new WaterTelemetry(
                 s5,
-                now.minusHours(h * 4L),
+                now.minusHours(h * 8L),
                 10.1,
                 9.2, // Brackish sea water
                 10.2,
@@ -185,43 +191,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // 3. Register Authentic Audio Recordings in Database
-        AudioRecord r1 = new AudioRecord(
-            s3,
-            "boat_engine_outboard.wav",
-            "/samples/boat_engine_outboard.wav",
-            "boat_engine",
-            0.94,
-            "HIGH",
-            "Гидроакустический комплекс ВКМСК (145 км)"
-        );
-        AudioRecord r2 = new AudioRecord(
-            s1,
-            "poaching_gunfire_shot.wav",
-            "/samples/poaching_gunfire_shot.wav",
-            "gunfire",
-            0.89,
-            "CRITICAL",
-            "Акустический буй Дамчикский №1"
-        );
-        AudioRecord r3 = new AudioRecord(
-            s2,
-            "sturgeon_water_splash.wav",
-            "/samples/sturgeon_water_splash.wav",
-            "fish_splash",
-            0.92,
-            "LOW",
-            "Биоакустический датчик Трёхизбинка"
-        );
-        AudioRecord r4 = new AudioRecord(
-            s5,
-            "ambient_caspian_waves.wav",
-            "/samples/ambient_caspian_waves.wav",
-            "ambient_noise",
-            0.97,
-            "NONE",
-            "Морская станция МГ-2 Тюлений"
-        );
-        audioRecordRepository.saveAll(List.of(r1, r2, r3, r4));
+        // Audio history starts empty; only actual external inference is persisted.
     }
 }
 

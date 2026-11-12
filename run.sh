@@ -14,6 +14,6 @@ if [ -f "target/demo-0.0.1-SNAPSHOT.jar" ]; then
     java -jar target/demo-0.0.1-SNAPSHOT.jar
 else
     echo "Сборка и запуск через Maven..."
-    mvn clean spring-boot:run -o
+    mvn spring-boot:run
 fi
 

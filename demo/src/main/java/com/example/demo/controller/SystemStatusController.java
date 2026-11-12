@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.SystemStatusResponse;
 import com.example.demo.service.AlertService;
+import com.example.demo.service.AiServiceClient;
 import com.example.demo.service.StationService;
 import com.example.demo.service.WaterTelemetryService;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +19,15 @@ public class SystemStatusController {
     private final StationService stationService;
     private final WaterTelemetryService telemetryService;
     private final AlertService alertService;
+    private final AiServiceClient aiClient;
 
     public SystemStatusController(StationService stationService,
                                   WaterTelemetryService telemetryService,
-                                  AlertService alertService) {
+                                  AlertService alertService, AiServiceClient aiClient) {
         this.stationService = stationService;
         this.telemetryService = telemetryService;
         this.alertService = alertService;
+        this.aiClient = aiClient;
     }
 
     @GetMapping("/health")
@@ -51,7 +54,7 @@ public class SystemStatusController {
             telemetry,
             totalAlerts,
             activeAlerts,
-            true
+            aiClient.isAvailable()
         ));
     }
 }

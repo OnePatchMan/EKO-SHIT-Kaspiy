@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.dto.AudioAnalysisResponse;
 import com.example.demo.dto.RecordingDeviceDto;
 import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.exception.AiServiceException;
 import com.example.demo.model.*;
 import com.example.demo.repository.AudioRecordRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,24 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class AudioAnalysisService {
@@ -36,6 +26,7 @@ public class AudioAnalysisService {
     private final AudioRecordRepository audioRecordRepository;
     private final StationService stationService;
     private final AlertService alertService;
+    private final AiServiceClient aiServiceClient;
 
     @Value("${ecoshield.upload-dir:uploads}")
     private String uploadDir;
@@ -79,10 +70,12 @@ public class AudioAnalysisService {
 
     public AudioAnalysisService(AudioRecordRepository audioRecordRepository,
                                 StationService stationService,
-                                AlertService alertService) {
+                                AlertService alertService,
+                                AiServiceClient aiServiceClient) {
         this.audioRecordRepository = audioRecordRepository;
         this.stationService = stationService;
         this.alertService = alertService;
+        this.aiServiceClient = aiServiceClient;
 
         initDeviceRegistry();
     }
@@ -162,88 +155,10 @@ public class AudioAnalysisService {
         // Live acoustic state update on this field hydrophone
         dev.currentSampleFile = sampleName;
 
-        // Classification: query Python AI first, fallback to heuristic if Python is unavailable
         byte[] audioBytes = getDeviceAudioStream(deviceId, soundScenario);
-        AiInferenceResult pyResult = queryPythonAiService(sampleName, audioBytes, station.getId());
-
-        String detectedClass;
-        double confidence;
-        String threatLevel;
-        boolean isThreat = false;
-        String sourceDesc;
-
-        if (pyResult != null) {
-            detectedClass = pyResult.detectedClass();
-            confidence = pyResult.confidence();
-            threatLevel = pyResult.threatLevel();
-            isThreat = detectedClass.equals("boat_engine") || detectedClass.equals("gunfire");
-            sourceDesc = "ИИ-модель (Python Flask :8000) • " + dev.name + " (" + dev.hydrophoneModel + ")";
-        } else {
-            if (sampleName.contains("boat") || sampleName.contains("motor")) {
-                detectedClass = "boat_engine";
-                confidence = 0.94;
-                threatLevel = "HIGH";
-                isThreat = true;
-            } else if (sampleName.contains("shot") || sampleName.contains("gunfire")) {
-                detectedClass = "gunfire";
-                confidence = 0.89;
-                threatLevel = "CRITICAL";
-                isThreat = true;
-            } else if (sampleName.contains("splash")) {
-                detectedClass = "fish_splash";
-                confidence = 0.92;
-                threatLevel = "LOW";
-            } else {
-                detectedClass = "ambient_noise";
-                confidence = 0.96;
-                threatLevel = "NONE";
-            }
-            sourceDesc = String.format("Прямой поток с устройства %s (%s)", dev.name, dev.hydrophoneModel);
-        }
-
-        AudioRecord record = new AudioRecord(
-            station,
-            sampleName,
-            "/samples/" + sampleName,
-            detectedClass,
-            confidence,
-            threatLevel,
-            sourceDesc
-        );
-        AudioRecord saved = audioRecordRepository.save(record);
-
-        Long alertId = null;
-        if (isThreat) {
-            AlertType alertType = detectedClass.equals("gunfire") ? AlertType.ACOUSTIC_GUNFIRE : AlertType.ACOUSTIC_BOAT_DETECTED;
-            AlertSeverity severity = detectedClass.equals("gunfire") ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
-            String msg = String.format("Гидрофон %s: Зафиксирован звук '%s' (достоверность: %.0f%%)",
-                dev.deviceId,
-                detectedClass.equals("boat_engine") ? "подвесной лодочный мотор" : "выстрел",
-                confidence * 100.0
-            );
-            String details = String.format("Сигнал поступил с полевого регистрирующего комплекса %s на станции %s. Обнаружена подозрительная активность в акватории ООПТ.",
-                dev.name, station.getName()
-            );
-
-            Alert alert = alertService.createAlert(station, alertType, severity, msg, details);
-            alertId = alert.getId();
-
-            stationService.updateStationStatus(station, StationStatus.WARNING);
-        }
-
-        return new AudioAnalysisResponse(
-            saved.getId(),
-            station.getId(),
-            station.getName(),
-            sampleName,
-            detectedClass,
-            confidence,
-            threatLevel,
-            sourceDesc,
-            isThreat,
-            alertId,
-            saved.getCreatedAt()
-        );
+        Map<String,Object> details = aiServiceClient.analyzeAudio(audioBytes, sampleName, station.getId());
+        AiInferenceResult inference = mapInference(details);
+        return saveAnalysis(station, sampleName, "/samples/" + sampleName, inference, details);
     }
 
     public byte[] getDeviceAudioStream(String deviceId) {
@@ -288,7 +203,9 @@ public class AudioAnalysisService {
             }
             ClassPathResource cp = new ClassPathResource("static/samples/" + filename);
             if (cp.exists()) {
-                return cp.getInputStream().readAllBytes();
+                try (InputStream stream = cp.getInputStream()) {
+                    return stream.readAllBytes();
+                }
             }
         } catch (IOException e) {
             // fallback
@@ -300,105 +217,49 @@ public class AudioAnalysisService {
     public AudioAnalysisResponse processAudioUpload(MultipartFile file, Long stationId) {
         Station station = stationService.getStationById(stationId);
 
-        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "live_recording.wav";
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) originalFilename = "recording.wav";
+        originalFilename = Paths.get(originalFilename.replace('\\', '/')).getFileName().toString();
+        byte[] data;
+        try {
+            data = file.getBytes();
+        } catch (IOException error) {
+            throw new AiServiceException(422, "Не удалось прочитать аудиозапись.", error);
+        }
+        Map<String,Object> details = aiServiceClient.analyzeAudio(data, originalFilename, stationId);
+        AiInferenceResult inference = mapInference(details);
         String storedFilename = UUID.randomUUID() + "_" + originalFilename;
-
         try {
             Path uploadPath = Paths.get(uploadDir, "audio");
             Files.createDirectories(uploadPath);
-            Path targetFile = uploadPath.resolve(storedFilename);
-            file.transferTo(targetFile.toFile());
-        } catch (IOException e) {
-            storedFilename = "virtual_" + storedFilename;
+            Files.write(uploadPath.resolve(storedFilename), data);
+        } catch (IOException error) {
+            throw new java.io.UncheckedIOException("Не удалось сохранить аудиозапись.", error);
         }
+        return saveAnalysis(station, originalFilename, storedFilename, inference, details);
+    }
 
-        byte[] fileBytes = null;
-        try {
-            fileBytes = file.getBytes();
-        } catch (Exception ignored) {}
-
-        AiInferenceResult pyResult = queryPythonAiService(originalFilename, fileBytes, stationId);
-
-        String detectedClass;
-        double confidence;
-        String threatLevel;
-        boolean isThreat = false;
-        String sourceDesc;
-
-        if (pyResult != null) {
-            detectedClass = pyResult.detectedClass();
-            confidence = pyResult.confidence();
-            threatLevel = pyResult.threatLevel();
-            isThreat = detectedClass.equals("boat_engine") || detectedClass.equals("gunfire");
-            sourceDesc = "ИИ-модель (Python Flask :8000) • " + originalFilename;
-        } else {
-            String lowerName = originalFilename.toLowerCase();
-            if (lowerName.contains("boat") || lowerName.contains("motor") || lowerName.contains("двигател") || lowerName.contains("лодка")) {
-                detectedClass = "boat_engine";
-                confidence = 0.94;
-                threatLevel = "HIGH";
-                isThreat = true;
-            } else if (lowerName.contains("shot") || lowerName.contains("gun") || lowerName.contains("выстрел")) {
-                detectedClass = "gunfire";
-                confidence = 0.88;
-                threatLevel = "CRITICAL";
-                isThreat = true;
-            } else if (lowerName.contains("splash") || lowerName.contains("fish") || lowerName.contains("рыба") || lowerName.contains("плеск")) {
-                detectedClass = "fish_splash";
-                confidence = 0.91;
-                threatLevel = "LOW";
-            } else if (lowerName.contains("ambient") || lowerName.contains("wave") || lowerName.contains("волна") || lowerName.contains("ветер")) {
-                detectedClass = "ambient_noise";
-                confidence = 0.95;
-                threatLevel = "NONE";
-            } else {
-                detectedClass = "boat_engine";
-                confidence = 0.89;
-                threatLevel = "HIGH";
-                isThreat = true;
-            }
-            sourceDesc = "Запись с полевого устройства инспектора ООПТ (" + originalFilename + ")";
-        }
-
-        AudioRecord record = new AudioRecord(
-            station,
-            originalFilename,
-            storedFilename,
-            detectedClass,
-            confidence,
-            threatLevel,
-            sourceDesc
-        );
+    private AudioAnalysisResponse saveAnalysis(Station station, String filename, String storedFilename,
+            AiInferenceResult inference, Map<String,Object> details) {
+        AudioRecord record = new AudioRecord(station, filename, storedFilename,
+            inference.detectedClass(), inference.score(), inference.threatLevel(), inference.source());
+        record.setAnalysisDetailsJson(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(details));
         AudioRecord saved = audioRecordRepository.save(record);
-
         Long alertId = null;
-        if (isThreat) {
-            AlertType alertType = detectedClass.equals("gunfire") ? AlertType.ACOUSTIC_GUNFIRE : AlertType.ACOUSTIC_BOAT_DETECTED;
-            AlertSeverity severity = detectedClass.equals("gunfire") ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
-            String msg = String.format("Акустический датчик: Обнаружен звук '%s' (достоверность: %.0f%%)", 
-                detectedClass.equals("boat_engine") ? "подвесной лодочный мотор" : "выстрел", confidence * 100.0);
-            String details = String.format("Зафиксировано микрофоном/гидрофоном на станции %s (%s). Возможная браконьерская активность в акватории.",
-                station.getCode(), station.getName());
-
-            Alert alert = alertService.createAlert(station, alertType, severity, msg, details);
+        if (inference.requiresReview()) {
+            AlertType type = inference.detectedClass().equals("gunshot_suspected")
+                ? AlertType.ACOUSTIC_GUNFIRE : AlertType.ACOUSTIC_BOAT_DETECTED;
+            String label = inference.detectedClass().equals("gunshot_suspected") ? "возможный выстрел" : "возможная лодка";
+            String message = String.format(java.util.Locale.ROOT,
+                "Акустическое событие: %s; оценка модели %.3f. Требуется проверка.", label, inference.score());
+            Alert alert = alertService.createAlert(station, type, AlertSeverity.WARNING, message,
+                "Станция " + station.getName() + ". Оценка YAMNet не является калиброванной вероятностью. Звук сам по себе не устанавливает браконьерство.");
             alertId = alert.getId();
-
             stationService.updateStationStatus(station, StationStatus.WARNING);
         }
-
-        return new AudioAnalysisResponse(
-            saved.getId(),
-            station.getId(),
-            station.getName(),
-            saved.getFilename(),
-            saved.getDetectedClass(),
-            saved.getConfidence(),
-            saved.getThreatLevel(),
-            saved.getAnalysisSource(),
-            isThreat,
-            alertId,
-            saved.getCreatedAt()
-        );
+        return new AudioAnalysisResponse(saved.getId(), station.getId(), station.getName(), filename,
+            inference.detectedClass(), inference.score(), inference.threatLevel(), inference.source(),
+            inference.requiresReview(), alertId, saved.getCreatedAt(), details);
     }
 
     @Transactional(readOnly = true)
@@ -424,65 +285,38 @@ public class AudioAnalysisService {
         );
     }
 
-    // Inter-service HTTP call to Python AI (FastAPI / Flask)
-    private AiInferenceResult queryPythonAiService(String filename, byte[] audioBytes, Long stationId) {
-        String aiUrl = "http://localhost:8000/api/ai/audio/analyze";
-        try {
-            String boundary = "===EcoShieldBoundary" + System.currentTimeMillis();
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-            // station_id parameter
-            baos.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
-            baos.write("Content-Disposition: form-data; name=\"station_id\"\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-            baos.write((stationId.toString() + "\r\n").getBytes(StandardCharsets.UTF_8));
-
-            // file parameter
-            baos.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
-            baos.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n").getBytes(StandardCharsets.UTF_8));
-            baos.write("Content-Type: audio/wav\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-            if (audioBytes != null && audioBytes.length > 0) {
-                baos.write(audioBytes);
-            } else {
-                baos.write("dummy audio content".getBytes(StandardCharsets.UTF_8));
-            }
-            baos.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(aiUrl))
-                .timeout(Duration.ofMillis(2000))
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(baos.toByteArray()))
-                .build();
-
-            HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(1200))
-                .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200) {
-                String body = response.body();
-                String detectedClass = extractJsonString(body, "detected_class", "boat_engine");
-                double confidence = extractJsonDouble(body, "confidence", 0.94);
-                String threatLevel = extractJsonString(body, "threat_level", "HIGH");
-                return new AiInferenceResult(detectedClass, confidence, threatLevel, "Python AI Microservice (PyTorch/Flask :8000)");
-            }
-        } catch (Exception ignored) {
-            // Python AI service offline or timeout -> Fallback to built-in heuristic
+    private AiInferenceResult mapInference(Map<String,Object> response) {
+        if (response == null || !(response.get("status") instanceof String status)
+                || !Set.of("events_detected", "no_target_event", "uncertain").contains(status)
+                || !(response.get("model_version") instanceof String version) || version.isBlank()
+                || !(response.get("events") instanceof List<?> events)) {
+            throw new AiServiceException(503, "Сервис ИИ вернул некорректную структуру анализа.");
         }
-        return null;
+        String source = "YAMNet; " + version + "; " + status + "; score is uncalibrated";
+        if (source.length() > 255) source = source.substring(0, 255);
+        if (events.isEmpty()) {
+            if (status.equals("events_detected")) throw new AiServiceException(503, "Сервис ИИ не передал обнаруженные события.");
+            return new AiInferenceResult(status, null, status.equals("uncertain") ? "UNKNOWN" : "NONE", source, false);
+        }
+        if (!status.equals("events_detected")) throw new AiServiceException(503, "Противоречивый статус анализа ИИ.");
+        AiInferenceResult selected = null;
+        for (Object item : events) {
+            if (!(item instanceof Map<?,?> event) || !(event.get("type") instanceof String type)
+                    || !Set.of("boat_suspected", "gunshot_suspected", "engine_detected").contains(type)
+                    || !(event.get("score") instanceof Number value)) {
+                throw new AiServiceException(503, "Сервис ИИ вернул некорректное акустическое событие.");
+            }
+            double score = value.doubleValue();
+            if (!Double.isFinite(score) || score < 0 || score > 1) {
+                throw new AiServiceException(503, "Сервис ИИ вернул некорректную оценку события.");
+            }
+            boolean review = !type.equals("engine_detected");
+            AiInferenceResult candidate = new AiInferenceResult(type, score, review ? "REVIEW" : "LOW", source, review);
+            if (selected == null || (review && !selected.requiresReview())
+                    || (review == selected.requiresReview() && score > selected.score())) selected = candidate;
+        }
+        return selected;
     }
 
-    private String extractJsonString(String json, String key, String defaultVal) {
-        Pattern p = Pattern.compile("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"");
-        Matcher m = p.matcher(json);
-        return m.find() ? m.group(1) : defaultVal;
-    }
-
-    private double extractJsonDouble(String json, String key, double defaultVal) {
-        Pattern p = Pattern.compile("\"" + key + "\"\\s*:\\s*([0-9.]+)");
-        Matcher m = p.matcher(json);
-        return m.find() ? Double.parseDouble(m.group(1)) : defaultVal;
-    }
-
-    private record AiInferenceResult(String detectedClass, double confidence, String threatLevel, String sourceDesc) {}
+    private record AiInferenceResult(String detectedClass, Double score, String threatLevel, String source, boolean requiresReview) {}
 }

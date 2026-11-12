@@ -1,141 +1,109 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.SpawningForecastResponse;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.exception.AiServiceException;
 import com.example.demo.model.Station;
 import com.example.demo.model.WaterTelemetry;
 import com.example.demo.repository.StationRepository;
 import com.example.demo.repository.WaterTelemetryRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.*;
+import java.util.*;
 
 @Service
 public class ForecastService {
-
     private final StationRepository stationRepository;
     private final WaterTelemetryRepository telemetryRepository;
+    private final AiServiceClient aiClient;
+    private final ZoneId telemetryZone;
+    private final String dataSource;
+    private final String levelDatum;
 
-    public ForecastService(StationRepository stationRepository, WaterTelemetryRepository telemetryRepository) {
-        this.stationRepository = stationRepository;
-        this.telemetryRepository = telemetryRepository;
+    public ForecastService(StationRepository stations, WaterTelemetryRepository telemetry, AiServiceClient aiClient,
+            @Value("${ecoshield.telemetry-zone:Europe/Moscow}") String zone,
+            @Value("${ecoshield.forecast.data-source:demo_synthetic}") String dataSource,
+            @Value("${ecoshield.forecast.level-datum:}") String levelDatum) {
+        this.stationRepository = stations;
+        this.telemetryRepository = telemetry;
+        this.aiClient = aiClient;
+        this.telemetryZone = ZoneId.of(zone);
+        this.dataSource = dataSource;
+        this.levelDatum = levelDatum == null ? "" : levelDatum.strip();
     }
 
     public SpawningForecastResponse calculateSpawningForecast(String species, Long stationId) {
-        String targetSpecies = (species != null && !species.isBlank()) ? species : "Русский осётр (Acipenser gueldenstaedtii)";
-
-        Station station = (stationId != null) 
-            ? stationRepository.findById(stationId).orElse(null)
-            : stationRepository.findAll().stream().findFirst().orElse(null);
-
-        String targetZone = station != null ? station.getTerritory() : "Дельта Волги — Дамчикский участок";
-
-        // Fetch recent telemetry to evaluate real hydrological conditions
-        List<WaterTelemetry> recent = station != null 
-            ? telemetryRepository.findByStationOrderByRecordedAtDesc(station, PageRequest.of(0, 10))
-            : List.of();
-
-        double avgTemp = recent.stream().mapToDouble(t -> t.getTemperatureC() != null ? t.getTemperatureC() : 12.0).average().orElse(12.5);
-        double avgSalinity = recent.stream().mapToDouble(t -> t.getSalinityPpt() != null ? t.getSalinityPpt() : 1.0).average().orElse(0.9);
-        double avgOxygen = recent.stream().mapToDouble(t -> t.getDissolvedOxygenMgL() != null ? t.getDissolvedOxygenMgL() : 8.0).average().orElse(7.8);
-        double avgLevel = recent.stream().mapToDouble(t -> t.getWaterLevelCm() != null ? t.getWaterLevelCm() : 250.0).average().orElse(260.0);
-
-        // Check if forecast is requested for Caspian Seal (Pusa caspica)
-        boolean isSeal = targetSpecies.toLowerCase().contains("тюлен") 
-                      || targetSpecies.toLowerCase().contains("pusa")
-                      || targetSpecies.toLowerCase().contains("нерп");
-
-        if (isSeal) {
-            // Caspian Seal (Pusa caspica) Autumn Migration Model
-            // Peak migration occurs in Nov-Dec from Middle Caspian to shallow North Caspian ice fields
-            double sealScore = 65.0;
-            if (avgSalinity > 5.0) sealScore += 18.0; // Marine preference
-            if (avgTemp < 13.0 && avgTemp > 3.0) sealScore += 14.0; // Temperature trigger for northward run
-            if (station != null && (station.getId() == 5L || station.getId() == 3L || station.getId() == 4L)) {
-                sealScore += 15.0; // Epicenters: Ostrov Tyuleniy, VKMSK, Agrakhan
-            }
-
-            sealScore = Math.max(20.0, Math.min(96.5, sealScore));
-
-            String sealStatus = sealScore >= 75.0 ? "MIGRATION_PEAK_HIGH_RISK" : "TRANSIT_MIGRATION";
-            String sealLimiting = "Пик сезонной миграции каспийского тюленя на северные лежбища. Критическая угроза: браконьерские крупноячеистые сети и скоростные байды.";
-            String sealRec = "🚨 ПОВЫШЕННЫЙ РЕЖИМ ОХРАНЫ ЭНДЕМИКА: Направить рейдовые группы по миграционному коридору 'Аграхан — Остров Тюлений — ВКМСК'. Провести траление акватории для ликвидации браконьерских сетей.";
-
-            Map<String, Object> sealSummary = new HashMap<>();
-            sealSummary.put("averageTemperatureC", Math.round(avgTemp * 10.0) / 10.0);
-            sealSummary.put("averageSalinityPpt", Math.round(avgSalinity * 10.0) / 10.0);
-            sealSummary.put("averageOxygenMgL", Math.round(avgOxygen * 10.0) / 10.0);
-            sealSummary.put("migrationCorridor", "Средний Каспий -> Остров Тюлений -> Северный Каспий (ВКМСК)");
-            sealSummary.put("conservationStatus", "Красная книга РФ, МСОП (Endangered)");
-
-            return new SpawningForecastResponse(
-                targetSpecies,
-                targetZone,
-                LocalDateTime.now(),
-                Math.round(sealScore * 10.0) / 10.0,
-                sealStatus,
-                LocalDate.now(),
-                LocalDate.now().plusDays(21),
-                sealSummary,
-                sealLimiting,
-                sealRec,
-                "Caspian Seal Migration AI (Pusa caspica Bio-Predictor v1.0)"
-            );
+        String targetSpecies = species == null || species.isBlank() ? "cyprinus_carpio" : species.strip();
+        if (!"cyprinus_carpio".equals(targetSpecies)) {
+            throw new IllegalArgumentException("Сценарий поддерживает только сазана / карпа: species=cyprinus_carpio");
         }
+        Station station = stationId == null
+                ? stationRepository.findAll().stream().findFirst().orElseThrow(() -> new ResourceNotFoundException("Нет станции для прогноза"))
+                : stationRepository.findById(stationId).orElseThrow(() -> new ResourceNotFoundException("Станция не найдена: " + stationId));
+        List<WaterTelemetry> recent = telemetryRepository.findByStationOrderByRecordedAtDesc(station, PageRequest.of(0, 1000));
+        List<Map<String,Object>> history = new ArrayList<>();
+        for (WaterTelemetry telemetry : recent) {
+            Map<String,Object> row = new LinkedHashMap<>();
+            if (telemetry.getRecordedAt() != null) row.put("timestamp", telemetry.getRecordedAt().atZone(telemetryZone).toInstant().toString());
+            if (telemetry.getTemperatureC() != null) row.put("temperature_c", telemetry.getTemperatureC());
+            if (!levelDatum.isBlank() && telemetry.getWaterLevelCm() != null) row.put("water_level_m", telemetry.getWaterLevelCm() / 100.0);
+            if (telemetry.getDissolvedOxygenMgL() != null) row.put("dissolved_oxygen_mg_l", telemetry.getDissolvedOxygenMgL());
+            // Inundation is not measured by this entity. Missing values stay missing.
+            // Salinity PPT is not silently relabeled as the external service's PSU.
+            history.add(row);
+        }
+        Map<String,Object> request = new LinkedHashMap<>();
+        request.put("station_id", station.getId().toString());
+        request.put("species", targetSpecies);
+        request.put("issued_at", Instant.now().toString());
+        request.put("horizon_hours", 72);
+        request.put("data_source", dataSource);
+        request.put("history", history);
+        if (!levelDatum.isBlank()) request.put("level_datum", levelDatum);
+        // The external service validates required temperature, 48h span and freshness.
+        // Validation failures and service outages propagate; no local prediction fallback.
+        Map<String,Object> upstream = aiClient.forecast(request);
+        validateForecast(upstream);
+        Map<String,Object> details = new LinkedHashMap<>(upstream);
+        if (levelDatum.isBlank()) {
+            List<Object> missing = new ArrayList<>();
+            if (upstream.get("missing_data") instanceof List<?> values) missing.addAll(values);
+            if (!missing.contains("level_datum")) missing.add("level_datum");
+            details.put("missing_data", missing);
+            List<Object> warnings = new ArrayList<>();
+            if (upstream.get("warnings") instanceof List<?> values) warnings.addAll(values);
+            warnings.add("Уровни воды не переданы: неизвестна система отсчёта (level_datum).");
+            details.put("warnings", warnings);
+        }
+        String version = Objects.toString(upstream.get("algorithm_version"), "unknown");
+        return new SpawningForecastResponse(targetSpecies, station.getTerritory(), LocalDateTime.now(telemetryZone), null,
+                Objects.toString(upstream.get("mode"), "scenario_conditions_forecast"),
+                date(upstream.get("valid_from")), date(upstream.get("valid_to")),
+                Map.of("observationCount", history.size(), "telemetryZone", telemetryZone.toString(), "dataSource", dataSource),
+                "См. missing_data и factors внешнего сценария",
+                "Демонстрационный сценарий требует проверки инспектором; фактический нерест не подтверждён.", version, details);
+    }
 
-        // Biological suitability algorithm for Acipenser gueldenstaedtii:
-        // - Optimum temperature: 11 - 15°C
-        // - Optimum salinity for delta spawning runs: < 1.5 ppt
-        // - Optimum oxygen: > 7.0 mg/L
-        // - Optimum flood level: > 230 cm
-        double score = 100.0;
+    private void validateForecast(Map<String,Object> result) {
+        try {
+            if (result == null || !"scenario_conditions_forecast".equals(result.get("mode"))
+                    || !Boolean.TRUE.equals(result.get("is_demo"))
+                    || !"not_validated_on_spawning_observations".equals(result.get("validation_status"))
+                    || !(result.get("algorithm_version") instanceof String version) || version.isBlank()
+                    || !(result.get("trajectory") instanceof List<?> rows) || rows.isEmpty()
+                    || !result.containsKey("probability") || result.get("probability") != null)
+                throw new IllegalArgumentException("Invalid forecast schema");
+            var from = OffsetDateTime.parse(result.get("valid_from").toString());
+            var to = OffsetDateTime.parse(result.get("valid_to").toString());
+            if (!to.isAfter(from)) throw new IllegalArgumentException("Invalid forecast period");
+        } catch (RuntimeException error) {
+            throw new AiServiceException(503, "Сервис ИИ вернул некорректный сценарный прогноз", error);
+        }
+    }
 
-        if (avgTemp < 8.0 || avgTemp > 20.0) score -= 40.0;
-        else if (avgTemp < 11.0 || avgTemp > 16.0) score -= 15.0;
-
-        if (avgSalinity > 5.0) score -= 35.0;
-        else if (avgSalinity > 2.0) score -= 15.0;
-
-        if (avgOxygen < 4.0) score -= 45.0;
-        else if (avgOxygen < 6.0) score -= 20.0;
-
-        if (avgLevel < 180.0) score -= 25.0;
-
-        score = Math.max(10.0, Math.min(98.5, score));
-
-        String status = score >= 75.0 ? "OPTIMAL_SPAWNING_CONDITIONS" : (score >= 50.0 ? "AUTUMN_WINTERING_CONCENTRATION" : "UNFAVORABLE");
-        String limitingFactor = score >= 75.0 
-            ? "Гидрологический режим в норме, температура и уровень паводка оптимальны"
-            : (avgTemp < 9.0 ? "Осеннее охлаждение воды: переход от миграции к залеганию на зимовальные ямы" : (avgOxygen < 6.0 ? "Дефицит кислорода" : "Колебания солёности"));
-
-        String recommendation = score >= 75.0
-            ? "Высокая вероятность массового нерестового хода. Рекомендовано выставление круглосуточных постов инспекции в прокопах и устьях."
-            : (avgTemp < 9.0 ? "Осетровые концентрируются на глубоких зимовальных ямах дельты ('Шабур', 'Седьмая Огнёвка'). Рекомендовано ночное патрулирование против браконьерского багрения." : "Период низкой нерестовой активности. Дежурное патрулирование.");
-
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("averageTemperatureC", Math.round(avgTemp * 10.0) / 10.0);
-        summary.put("averageSalinityPpt", Math.round(avgSalinity * 10.0) / 10.0);
-        summary.put("averageOxygenMgL", Math.round(avgOxygen * 10.0) / 10.0);
-        summary.put("waterLevelCm", Math.round(avgLevel * 10.0) / 10.0);
-        summary.put("optimalTemperatureRange", "11.0 - 15.5 °C");
-
-        return new SpawningForecastResponse(
-            targetSpecies,
-            targetZone,
-            LocalDateTime.now(),
-            Math.round(score * 10.0) / 10.0,
-            status,
-            LocalDate.now().plusDays(2),
-            LocalDate.now().plusDays(9),
-            summary,
-            limitingFactor,
-            recommendation,
-            "Caspian Eco-Predictor v1.2 (Hybrid Hydrological AI)"
-        );
+    private LocalDate date(Object value) {
+        return value == null ? null : OffsetDateTime.parse(value.toString()).atZoneSameInstant(telemetryZone).toLocalDate();
     }
 }
-

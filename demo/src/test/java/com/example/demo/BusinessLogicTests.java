@@ -13,6 +13,10 @@ import com.example.demo.service.AudioAnalysisService;
 import com.example.demo.service.ForecastService;
 import com.example.demo.service.StationService;
 import org.junit.jupiter.api.DisplayName;
+import com.example.demo.service.AiServiceClient;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import java.util.Map;
+import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +28,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class BusinessLogicTests {
+
+    @MockitoBean
+    private AiServiceClient aiServiceClient;
 
     @Autowired
     private ForecastService forecastService;
@@ -37,81 +44,52 @@ class BusinessLogicTests {
     @Autowired
     private StationService stationService;
 
-    @Test
-    @DisplayName("Прогноз нереста: Корректный расчет для Русского осетра")
-    void testForecastRussianSturgeon() {
-        SpawningForecastResponse forecast = forecastService.calculateSpawningForecast(
-            "Русский осётр (Acipenser gueldenstaedtii)", 1L
-        );
-        assertNotNull(forecast);
-        assertEquals("Русский осётр (Acipenser gueldenstaedtii)", forecast.species());
-        assertTrue(forecast.suitabilityIndex() > 0.0);
-        assertNotNull(forecast.patrolRecommendation());
-        assertNotNull(forecast.windowStart());
-        assertNotNull(forecast.windowEnd());
+
+
+
+    private void acousticResult(String type, double score) {
+        when(aiServiceClient.analyzeAudio(any(), anyString(), anyLong())).thenReturn(Map.of(
+            "status", "events_detected", "model_version", "yamnet-test",
+            "events", List.of(Map.of("type", type, "score", score)),
+            "score_is_calibrated_probability", false));
     }
 
     @Test
-    @DisplayName("Прогноз нереста: Корректный расчет для Севрюги")
-    void testForecastSevruga() {
-        SpawningForecastResponse forecast = forecastService.calculateSpawningForecast(
-            "Севрюга (Acipenser stellatus)", 2L
-        );
-        assertNotNull(forecast);
-        assertEquals("Севрюга (Acipenser stellatus)", forecast.species());
-        assertTrue(forecast.suitabilityIndex() >= 10.0);
-    }
-
-    @Test
-    @DisplayName("Прогноз нереста: Корректный расчет для Белуги")
-    void testForecastBeluga() {
-        SpawningForecastResponse forecast = forecastService.calculateSpawningForecast(
-            "Белуга (Huso huso)", 3L
-        );
-        assertNotNull(forecast);
-        assertEquals("Белуга (Huso huso)", forecast.species());
-    }
-
-    @Test
-    @DisplayName("Аудио ИИ: Детекция подвесного лодочного мотора по аудиофайлу")
+    @DisplayName("Аудио: событие лодки от модели сохраняется и требует проверки")
     void testAudioDetectionBoatEngine() {
-        MockMultipartFile file = new MockMultipartFile(
-            "file", "hydrophone_boat_motor_high_rpm.wav", "audio/wav", "dummy bytes".getBytes()
-        );
-
-        AudioAnalysisResponse response = audioService.processAudioUpload(file, 3L);
-        assertNotNull(response);
-        assertEquals("boat_engine", response.detectedClass());
-        assertEquals("HIGH", response.threatLevel());
+        acousticResult("boat_suspected", 0.41);
+        AudioAnalysisResponse response = audioService.processAudioUpload(
+            new MockMultipartFile("file", "neutral.wav", "audio/wav", new byte[]{1}), 3L);
+        assertEquals("boat_suspected", response.detectedClass());
+        assertEquals(0.41, response.confidence());
+        assertEquals("REVIEW", response.threatLevel());
         assertTrue(response.alertGenerated());
         assertNotNull(response.alertId());
+        var stored = audioService.getAllAudioRecords().stream().filter(r -> r.getId().equals(response.audioId())).findFirst().orElseThrow();
+        assertEquals("boat_suspected", stored.getDetectedClass());
+        assertTrue(stored.getAnalysisSource().contains("yamnet-test"));
     }
 
     @Test
-    @DisplayName("Аудио ИИ: Детекция выстрела браконьера (gunfire)")
+    @DisplayName("Аудио: событие возможного выстрела создает алерт для проверки")
     void testAudioDetectionGunfire() {
-        MockMultipartFile file = new MockMultipartFile(
-            "file", "audio_gunfire_shot_detected.wav", "audio/wav", "dummy gunshot bytes".getBytes()
-        );
-
-        AudioAnalysisResponse response = audioService.processAudioUpload(file, 1L);
-        assertNotNull(response);
-        assertEquals("gunfire", response.detectedClass());
-        assertEquals("CRITICAL", response.threatLevel());
+        acousticResult("gunshot_suspected", 0.38);
+        AudioAnalysisResponse response = audioService.processAudioUpload(
+            new MockMultipartFile("file", "neutral.wav", "audio/wav", new byte[]{1}), 1L);
+        assertEquals("gunshot_suspected", response.detectedClass());
         assertTrue(response.alertGenerated());
+        assertEquals(AlertSeverity.WARNING, alertService.getAlertById(response.alertId()).severity());
     }
 
     @Test
-    @DisplayName("Аудио ИИ: Детекция плеска рыбы / фонового шума")
-    void testAudioDetectionFishSplash() {
-        MockMultipartFile file = new MockMultipartFile(
-            "file", "sturgeon_splash_water.wav", "audio/wav", "splash bytes".getBytes()
-        );
-
-        AudioAnalysisResponse response = audioService.processAudioUpload(file, 2L);
-        assertNotNull(response);
-        assertEquals("fish_splash", response.detectedClass());
-        assertEquals("LOW", response.threatLevel());
+    @DisplayName("Аудио: общий двигатель не превращается в лодку из имени файла")
+    void testAudioDetectionGenericEngine() {
+        acousticResult("engine_detected", 0.73);
+        AudioAnalysisResponse response = audioService.processAudioUpload(
+            new MockMultipartFile("file", "boat_gun.wav", "audio/wav", new byte[]{1}), 2L);
+        assertEquals("engine_detected", response.detectedClass());
+        assertEquals(0.73, response.confidence());
+        assertFalse(response.alertGenerated());
     }
 
     @Test

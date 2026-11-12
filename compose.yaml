@@ -1,0 +1,27 @@
+services:
+  ai:
+    build: ./ai
+    volumes:
+      - ai-models:/app/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8001/health',timeout=5))['audio_model_ready']"]
+      interval: 10s
+      timeout: 6s
+      start_period: 120s
+      retries: 30
+  web:
+    build: ./demo
+    environment:
+      ECOSHIELD_AI_SERVICE_URL: http://ai:8001
+      ECOSHIELD_TELEMETRY_ZONE: Europe/Moscow
+      ECOSHIELD_FORECAST_DATA_SOURCE: demo_synthetic
+    ports:
+      - "8080:8080"
+    volumes:
+      - web-uploads:/app/uploads
+    depends_on:
+      ai:
+        condition: service_healthy
+volumes:
+  ai-models:
+  web-uploads:

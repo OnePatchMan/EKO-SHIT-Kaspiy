@@ -18,7 +18,7 @@ public class ForecastController {
 
     @GetMapping("/spawning")
     public ResponseEntity<SpawningForecastResponse> getSpawningForecast(
-            @RequestParam(required = false, defaultValue = "Русский осётр (Acipenser gueldenstaedtii)") String species,
+            @RequestParam(required = false, defaultValue = "cyprinus_carpio") String species,
             @RequestParam(required = false) Long stationId) {
         return ResponseEntity.ok(forecastService.calculateSpawningForecast(species, stationId));
     }

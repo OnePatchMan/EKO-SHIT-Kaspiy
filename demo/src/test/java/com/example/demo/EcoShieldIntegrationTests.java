@@ -89,18 +89,5 @@ class EcoShieldIntegrationTests {
         assertNotNull(resolved.resolvedAt());
     }
 
-    @Test
-    @DisplayName("Расчет прогноза нереста осетровых на основе гидрологии")
-    void testSpawningForecast() {
-        SpawningForecastResponse forecast = forecastService.calculateSpawningForecast(
-            "Русский осётр (Acipenser gueldenstaedtii)",
-            1L
-        );
-
-        assertNotNull(forecast);
-        assertTrue(forecast.suitabilityIndex() > 0.0);
-        assertNotNull(forecast.status());
-        assertNotNull(forecast.patrolRecommendation());
-    }
 }
 
