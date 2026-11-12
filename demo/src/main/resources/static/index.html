@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Эко-Щит Каспия — Цифровой помощник инспектора ООПТ</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="logo-shield">🛡️</div>
+      <div>
+        <h1 class="header-title">ЭКО-ЩИТ КАСПИЯ</h1>
+        <p class="header-subtitle">ИИ-система раннего предупреждения для дельтовых и морских ООПТ</p>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-pill">
+        <span class="status-indicator live"></span>
+        <span>Сервер: <strong id="server-status">ОНЛАЙН</strong></span>
+      </div>
+      <div class="stat-pill">
+        <span>Станций: <strong id="stat-stations">5</strong></span>
+      </div>
+      <div class="stat-pill alert-pill">
+        <span>Активных тревог: <strong id="stat-alerts">0</strong></span>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="refreshAllData()">🔄 Обновить</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Top Row: Map and Alerts Feed -->
+    <div class="grid-top">
+      <!-- Map Section -->
+      <section class="card map-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🗺️ Геоинформационная карта постов ООПТ (Дельта Волги и Каспий)</span>
+          </div>
+          <div class="map-legend">
+            <span class="legend-item"><span class="dot dot-normal"></span> Штатно</span>
+            <span class="legend-item"><span class="dot dot-warning"></span> Внимание</span>
+            <span class="legend-item"><span class="dot dot-critical"></span> Тревога</span>
+          </div>
+        </div>
+        <div id="map" class="map-view"></div>
+      </section>
+
+      <!-- Alerts Section -->
+      <section class="card alerts-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🚨 Оперативные предупреждения и инциденты</span>
+          </div>
+          <div class="filter-group">
+            <button class="btn-filter active" id="btn-filter-active" onclick="filterAlerts(false)">Активные</button>
+            <button class="btn-filter" id="btn-filter-all" onclick="filterAlerts(null)">Все</button>
+          </div>
+        </div>
+        <div class="alerts-feed" id="alerts-feed">
+          <div class="loading-placeholder">Загрузка предупреждений...</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom Row: Telemetry Charts and Multifunctional AI/IoT Panel -->
+    <div class="grid-bottom">
+      <!-- Telemetry Charts -->
+      <section class="card chart-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📊 Динамика гидрологических параметров</span>
+          </div>
+          <div class="select-wrapper">
+            <label for="station-selector">Станция:</label>
+            <select id="station-selector" onchange="onStationChanged(this.value)">
+              <option value="1">Буй Дамчикский №1 (Астраханский заповедник)</option>
+              <option value="2">Буй Трёхизбинский №2 (Дельта Волги)</option>
+              <option value="3">Морской буй 'Северный Каспий' №3</option>
+              <option value="4">Станция 'Аграханский залив' №4</option>
+              <option value="5">Морской буй 'Остров Тюлений' №5</option>
+            </select>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="telemetryChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Tabs: Audio AI / Sturgeon Spawning / IoT Injection -->
+      <section class="card tools-card">
+        <div class="tabs-nav">
+          <button class="tab-btn active" onclick="switchTab('tab-audio')">🎙️ Акустический ИИ</button>
+          <button class="tab-btn" onclick="switchTab('tab-forecast')">🐟 Прогноз нереста</button>
+          <button class="tab-btn" onclick="switchTab('tab-simulator')">🧪 IoT-Симулятор</button>
+        </div>
+
+        <div class="tab-content active" id="tab-audio">
+          <h3 class="tab-heading">Акустический мониторинг браконьерства</h3>
+          <p class="tab-desc">Нейросетевая детекция подвесных моторов лодок («Байда») и выстрелов по гидроакустическим сэмплам.</p>
+
+          <div class="upload-zone" id="drop-zone">
+            <div class="upload-icon">🔊</div>
+            <p>Перетащите аудиофайл (.wav, .mp3) или выберите:</p>
+            <input type="file" id="audio-file-input" accept="audio/*" class="file-input">
+            <div class="upload-actions">
+              <label for="audio-station-select">Буй:</label>
+              <select id="audio-station-select">
+                <option value="3">Буй №3 (Северный Каспий)</option>
+                <option value="1">Буй №1 (Дамчикский участок)</option>
+                <option value="2">Буй №2 (Трёхизбинский)</option>
+                <option value="5">Буй №5 (Остров Тюлений)</option>
+              </select>
+              <button class="btn btn-primary" onclick="uploadAudio()">🚀 Анализ ИИ</button>
+            </div>
+          </div>
+
+          <div class="preset-buttons">
+            <span class="preset-label">Акустические сэмплы гидрофонов Каспия (нажмите для анализа и прослушивания):</span>
+            <button class="btn btn-preset" onclick="simulateAudioTest('boat_engine_outboard.wav')">🚤 Подвесной мотор (Байда)</button>
+            <button class="btn btn-preset" onclick="simulateAudioTest('poaching_gunfire_shot.wav')">💥 Выстрел браконьера</button>
+            <button class="btn btn-preset" onclick="simulateAudioTest('sturgeon_water_splash.wav')">🐟 Плеск рыбы / Нерестилище</button>
+            <button class="btn btn-preset" onclick="simulateAudioTest('ambient_caspian_waves.wav')">🌊 Шум волн Каспия</button>
+          </div>
+
+          <div id="audio-result" class="result-box hidden"></div>
+        </div>
+
+        <div class="tab-content" id="tab-forecast">
+          <h3 class="tab-heading">Предиктивный гидробиологический прогноз</h3>
+          <p class="tab-desc">Сценарное моделирование нерестового хода ценных видов рыб на основе гидрологии дельты Волги.</p>
+
+          <div class="forecast-controls">
+            <div class="form-row">
+              <label for="species-select">Целевой вид:</label>
+              <select id="species-select" onchange="loadForecast()">
+                <option value="Русский осётр (Acipenser gueldenstaedtii)">Русский осётр (Acipenser gueldenstaedtii)</option>
+                <option value="Севрюга (Acipenser stellatus)">Севрюга (Acipenser stellatus)</option>
+                <option value="Белуга (Huso huso)">Белуга (Huso huso)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="forecast-station-select">Зона ООПТ:</label>
+              <select id="forecast-station-select" onchange="loadForecast()">
+                <option value="1">Дамчикский участок (Волго-Каспийский бассейн)</option>
+                <option value="2">Трёхизбинский участок (Тишковский рукав)</option>
+                <option value="4">Аграханский залив (Дагестанский заповедник)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="forecast-card" class="forecast-result">
+            <div class="loading-placeholder">Расчет гидробиологического оптимума...</div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-simulator">
+          <h3 class="tab-heading">Симулятор датчиков IoT-буя</h3>
+          <p class="tab-desc">Мгновенная инъекция измерений для демонстрации автоматического детектора аномалий.</p>
+
+          <form id="telemetry-form" onsubmit="submitTelemetry(event)" class="form-grid">
+            <div class="form-group">
+              <label>Буй:</label>
+              <select id="sim-station" required>
+                <option value="1">Буй №1 (Дамчикский)</option>
+                <option value="2">Буй №2 (Трёхизбинский)</option>
+                <option value="3">Буй №3 (Северный Каспий)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Кислород O₂ (мг/л):</label>
+              <input type="number" step="0.1" id="sim-oxygen" value="3.4" required>
+              <span class="form-hint">Норма > 6.0 мг/л, Замор < 4.0</span>
+            </div>
+            <div class="form-group">
+              <label>Температура (°C):</label>
+              <input type="number" step="0.1" id="sim-temp" value="12.5" required>
+            </div>
+            <div class="form-group">
+              <label>Солёность (‰):</label>
+              <input type="number" step="0.1" id="sim-salinity" value="1.1" required>
+            </div>
+            <div class="form-group">
+              <label>pH:</label>
+              <input type="number" step="0.1" id="sim-ph" value="7.4" required>
+            </div>
+            <div class="form-group">
+              <label>Уровень воды (см):</label>
+              <input type="number" step="1" id="sim-level" value="255" required>
+            </div>
+            <div class="form-actions-full">
+              <button type="submit" class="btn btn-primary">📡 Отправить измерение</button>
+              <button type="button" class="btn btn-outline" onclick="applyPreset('critical')">⚠️ Пресет: Замор рыбы (O₂ 2.9)</button>
+              <button type="button" class="btn btn-outline" onclick="applyPreset('normal')">✅ Пресет: Норма</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

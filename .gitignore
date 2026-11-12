@@ -1,0 +1,24 @@
+# Build & binaries
+target/
+demo/target/
+*.class
+*.jar
+*.war
+
+# Temporary & zip archives
+*.zip
+*.log
+.~lock.*
+
+
+# Uploads directory
+uploads/
+demo/uploads/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
