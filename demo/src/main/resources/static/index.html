@@ -148,11 +148,15 @@
           </div>
 
           <!-- Audio Player & Visualizer -->
-          <div class="live-stream-panel">
+          <div class="live-stream-panel" style="border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(10, 15, 29, 0.85);">
             <div class="stream-bar">
               <div class="stream-info">
-                <span class="live-indicator"><span class="blink-dot"></span> АУДИОПЛЕЕР</span>
-                <span class="stream-dev-name" id="stream-dev-title">Выберите звук выше или загрузите аудиофайл</span>
+                <span style="font-weight: 700; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;">
+                  <span>🔊</span> АУДИОПЛЕЕР:
+                </span>
+                <span class="stream-dev-name" id="stream-dev-title" style="color: var(--text-main); font-weight: 500;">
+                  Нажмите на любой звук выше для воспроизведения
+                </span>
               </div>
               <div class="stream-actions">
                 <button class="btn btn-sm btn-secondary" id="btn-toggle-stream" onclick="toggleAudioPlayback()">
