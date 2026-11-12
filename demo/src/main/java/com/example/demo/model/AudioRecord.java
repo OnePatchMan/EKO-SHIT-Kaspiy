@@ -33,6 +33,13 @@ public class AudioRecord {
     @Column(name = "analysis_source")
     private String analysisSource;
 
+    @Lob
+    @Column(name = "analysis_details_json")
+    private String analysisDetailsJson;
+
+    public String getAnalysisDetailsJson() { return analysisDetailsJson; }
+    public void setAnalysisDetailsJson(String value) { analysisDetailsJson = value; }
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

@@ -107,7 +107,7 @@
       <section class="card tools-card">
         <div class="tabs-nav">
           <button class="tab-btn active" onclick="switchTab('tab-audio')">🎧 Акустический ИИ</button>
-          <button class="tab-btn" onclick="switchTab('tab-forecast')">🦭 Миграция тюленей и нерест</button>
+          <button class="tab-btn" onclick="switchTab('tab-forecast')">🐟 Сценарий условий</button>
           <button class="tab-btn" onclick="switchTab('tab-simulator')">🧪 IoT-Симулятор</button>
         </div>
 
@@ -115,7 +115,7 @@
           <div class="tab-header-row">
             <div>
               <h3 class="tab-heading">🎧 Акустический мониторинг акватории (ИИ-детекция)</h3>
-              <p class="tab-desc">Нейросетевая детекция подвесных моторов лодок («Байда»), оружейных выстрелов, всплесков рыбы и шума моря по гидроакустическим записям.</p>
+              <p class="tab-desc">Анализ аудиозаписей внешней моделью YAMNet: возможные звуки лодок, двигателей и выстрелов. Результат требует проверки инспектором; модель не валидирована на гидрофонах Каспия.</p>
             </div>
           </div>
 
@@ -128,7 +128,7 @@
                 <span class="btn-icon">🚤</span>
                 <div class="btn-text-wrap">
                   <strong>Мотор лодки («Байда»)</strong>
-                  <small>Звук мотора браконьера</small>
+                  <small>Образец звука мотора</small>
                 </div>
               </button>
               <button class="btn btn-test-action btn-shot" onclick="playAndAnalyzeSound('shot')">
@@ -142,7 +142,7 @@
                 <span class="btn-icon">🐟</span>
                 <div class="btn-text-wrap">
                   <strong>Плеск рыбы</strong>
-                  <small>Всплеск осетровых в воде</small>
+                  <small>Образец звука всплеска</small>
                 </div>
               </button>
               <button class="btn btn-test-action btn-ambient" onclick="playAndAnalyzeSound('ambient')">
@@ -179,17 +179,11 @@
           <!-- Custom File Upload -->
           <div class="aux-audio-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono);">
-              📁 Загрузить свою гидроакустическую запись (.wav, .mp3)
+              📁 Загрузить свою гидроакустическую запись (настоящий .wav)
             </div>
             <div class="manual-upload-box">
-              <input type="file" id="audio-file-input" accept="audio/*" class="file-input" onchange="onAudioFileSelected(this)">
-              <select id="station-select-audio">
-                <option value="1">Станция ВКМСК-145</option>
-                <option value="2">Дамчикский участок</option>
-                <option value="3">Трёхизбинка</option>
-                <option value="4">Аграханский залив</option>
-                <option value="5">Остров Тюлений</option>
-              </select>
+              <input type="file" id="audio-file-input" accept=".wav,audio/wav,audio/x-wav" class="file-input" onchange="onAudioFileSelected(this)">
+              <select id="station-select-audio"><option value="">Загрузка станций…</option></select>
               <button class="btn btn-sm btn-primary" onclick="uploadAudio()">⚡ Анализ ИИ</button>
             </div>
             <div id="file-preview-banner" class="file-preview-banner hidden"></div>
@@ -200,33 +194,24 @@
         </div>
 
         <div class="tab-content" id="tab-forecast">
-          <h3 class="tab-heading">🦭 Прогноз миграции каспийского тюленя и нереста осетровых</h3>
-          <p class="tab-desc">ИИ-моделирование сезонной миграции эндемика Красной книги РФ (*Pusa caspica*) и нерестового хода осетровых на основе гидрологической телеметрии Каспия.</p>
+          <h3 class="tab-heading">Сценарий условий для сазана / карпа</h3>
+          <p class="tab-desc">Демонстрационная проекция гидрологических условий на 72 часа для Cyprinus carpio. Требует истории от 48 часов; сведения о затоплении поймы отсутствуют. Сценарий не валидирован по наблюдениям нереста.</p>
 
           <div class="forecast-controls">
             <div class="form-row">
               <label for="species-select">Целевой вид / Объект охраны:</label>
               <select id="species-select" onchange="loadForecast()">
-                <option value="Каспийский тюлень (Pusa caspica) — Сезонная миграция" selected>🦭 Каспийский тюлень (Pusa caspica) — Сезонная миграция</option>
-                <option value="Русский осётр (Acipenser gueldenstaedtii)">🐟 Русский осётр (Acipenser gueldenstaedtii)</option>
-                <option value="Севрюга (Acipenser stellatus)">🐟 Севрюга (Acipenser stellatus)</option>
-                <option value="Белуга (Huso huso)">🐟 Белуга (Huso huso)</option>
+                <option value="cyprinus_carpio" selected>Сазан / карп (Cyprinus carpio)</option>
               </select>
             </div>
             <div class="form-row">
               <label for="forecast-station-select">Зона ООПТ / Станция:</label>
-              <select id="forecast-station-select" onchange="loadForecast()">
-                <option value="5" selected>Морской буй 'Остров Тюлений' №5 (Ключевое лежбище)</option>
-                <option value="3">Морской буй 'Северный Каспий' ВКМСК 145 км (Миграционный фарватер)</option>
-                <option value="4">Аграханский залив (Дагестанский заповедник)</option>
-                <option value="1">Дамчикский участок (Дельта Волги)</option>
-                <option value="2">Трёхизбинский участок (Дельта Волги)</option>
-              </select>
+              <select id="forecast-station-select" onchange="loadForecast()"><option value="">Загрузка станций…</option></select>
             </div>
           </div>
 
           <div id="forecast-card" class="forecast-result">
-            <div class="loading-placeholder">Расчет гидробиологического оптимума...</div>
+            <div class="loading-placeholder">Запрос сценария условий...</div>
           </div>
         </div>
 

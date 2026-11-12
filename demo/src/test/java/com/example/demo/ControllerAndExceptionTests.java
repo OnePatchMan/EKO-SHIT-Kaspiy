@@ -8,6 +8,9 @@ import com.example.demo.exception.ValidationException;
 import com.example.demo.model.AlertSeverity;
 import com.example.demo.model.StationStatus;
 import org.junit.jupiter.api.DisplayName;
+import com.example.demo.service.AiServiceClient;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class ControllerAndExceptionTests {
+
+    @MockitoBean
+    private AiServiceClient aiServiceClient;
 
     @Autowired
     private StationController stationController;
@@ -111,14 +117,6 @@ class ControllerAndExceptionTests {
         assertEquals(firstId, response.getBody().id());
     }
 
-    @Test
-    @DisplayName("Контроллер Forecast: GET /api/forecast/spawning")
-    void testForecastControllerGet() {
-        ResponseEntity<SpawningForecastResponse> response = forecastController.getSpawningForecast("Русский осётр", 1L);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().suitabilityIndex() > 0.0);
-    }
 
     @Test
     @DisplayName("Контроллер System: GET /api/system/health")
@@ -194,11 +192,15 @@ class ControllerAndExceptionTests {
     @Test
     @DisplayName("Контроллер Audio: POST /api/audio/devices/{id}/capture прямой захват и анализ угрозы")
     void testAudioControllerCaptureFromDevice() {
+        when(aiServiceClient.analyzeAudio(any(), anyString(), anyLong())).thenReturn(Map.of(
+            "status", "events_detected", "model_version", "yamnet-test",
+            "events", List.of(Map.of("type", "engine_detected", "score", 0.72))));
         ResponseEntity<AudioAnalysisResponse> response = audioAnalysisController.captureFromDevice("DEV-DAM-01", "boat");
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("boat_engine", response.getBody().detectedClass());
-        assertTrue(response.getBody().alertGenerated());
+        assertEquals("engine_detected", response.getBody().detectedClass());
+        assertFalse(response.getBody().alertGenerated());
+        assertEquals("yamnet-test", response.getBody().analysisDetails().get("model_version"));
     }
 
     @Test

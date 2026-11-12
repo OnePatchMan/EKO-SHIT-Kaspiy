@@ -1,293 +1,45 @@
-# Руководство по интеграции: Java Бэкенд ↔ Фронтенд ↔ Python AI
+# Подключение отдельного EcoShield AI
 
-Данный документ описывает протоколы, контракты, форматы данных и готовые примеры кода для соединения трёх частей системы «Эко-Щит Каспия»:
-1. **Frontend (Участник 1)** $\leftrightarrow$ **Java Backend (Участник 2)**
-2. **Java Backend (Участник 2)** $\leftrightarrow$ **Python AI Service (Участник 3)**
+## Разделение проектов
 
----
+Этот репозиторий содержит веб-приложение, Java HTTP клиент и исходный код ИИ в ai/. Код нейросети хранится в ai/, а веса, Python окружение и обучающие данные загружаются отдельно и исключены из Git. Старый scripts/ai_service.py удалён: он выдавал фиксированные классы по именам файлов.
 
-## ЧАСТЬ 1. Интеграция с Фронтендом (Участник 1)
+Браузер обращается к Java на8080. Java вызывает отдельный сервис по ECOSHIELD_AI_SERVICE_URL (по умолчанию http://127.0.0.1:8001). Для разных контейнеров localhost не подходит: укажите внутреннее имя/адрес контейнера модели. Прямой доступ браузера к модели не требуется.
 
-### 1.1. Базовые параметры подключения
-- **Базовый URL API:** `http://localhost:8080`
-- **CORS:** Включен на Java-бэкенде для всех источников (`*`) и всех HTTP-методов (`GET`, `POST`, `PATCH`, `PUT`, `DELETE`, `OPTIONS`). Фронтенд может запускаться на `http://localhost:3000`, `http://localhost:5173` (Vite) или любом другом локальном порту без проблем с блокировкой браузером.
-- **Формат данных:** `application/json` (для медиа: `multipart/form-data`).
+## Контракт аудио
 
----
+Веб: POST /api/audio/upload, multipart file и stationId. Java → ИИ: POST /v1/audio/analyze, multipart file, station_id и recorded_at с часовым поясом. WAV1–60секунд, до10MiB. Микрофон браузера преобразуется в настоящий PCM16 WAV, а не просто переименовывается. MP3/WebM без декодирования не принимаются как WAV.
 
-### 1.2. TypeScript интерфейсы для Фронтенда
+Ответ модели: status, events[] с type/start_seconds/end_seconds/score, model_version, target_scores, warnings, score_is_calibrated_probability=false. Java сохраняет выбранный класс и оценку; полный ответ доступен в analysisDetails текущего HTTP ответа. Полный ответ также сохраняется в analysisDetailsJson записи аудио.
 
-Фронтендер может скопировать эти интерфейсы в свой проект (`types/api.ts`):
+boat_suspected и gunshot_suspected требуют проверки инспектором; engine_detected не считается лодкой. uncertain/no_target_event не доказывают безопасность акватории. UI показывает исходный score и версию модели, не процент достоверности или вероятность браконьерства.
 
-```typescript
-// Статус станции
-export type StationStatus = 'NORMAL' | 'WARNING' | 'CRITICAL' | 'OFFLINE';
+Запасной классификации по имени файла, выбранному сценарию или случайному числу нет. При недоступности модели —503. При неподдерживаемом файле или ошибке данных —422. Ответ с неверной модельной схемой не превращается в boat_engine.
 
-// Станция мониторинга (маркер на карте)
-export interface Station {
-  id: number;
-  code: string;
-  name: string;
-  territory: string;
-  latitude: number;
-  longitude: number;
-  status: StationStatus;
-  lastUpdated: string;
-  latestTelemetry?: WaterTelemetrySummary;
-}
+## Сценарный расчёт
 
-// Краткая сводка телеметрии для карточки буя на карте
-export interface WaterTelemetrySummary {
-  id: number;
-  recordedAt: string;
-  temperatureC: number;
-  salinityPpt: number;
-  dissolvedOxygenMgL: number;
-  ph: number;
-  turbidityNtu: number;
-  waterLevelCm: number;
-  qualityStatus: 'NORMAL' | 'WARNING' | 'CRITICAL';
-}
+Веб: GET /api/forecast/spawning?species=cyprinus_carpio&stationId=1. Java получает фактическую историю выбранной станции и вызывает POST /v1/spawning/forecast. Поддержан только сазан (Cyprinus carpio); локальные псевдопрогнозы осетра/тюленя удалены.
 
-// Предупреждение / Инцидент
-export interface Alert {
-  id: number;
-  stationId: number;
-  stationCode: string;
-  stationName: string;
-  territory: string;
-  latitude: number;
-  longitude: number;
-  type: string;
-  severity: 'INFO' | 'WARNING' | 'CRITICAL';
-  message: string;
-  details: string;
-  createdAt: string;
-  resolved: boolean;
-  resolvedAt?: string;
-}
+Время существующих записей LocalDateTime интерпретируется через ECOSHIELD_TELEMETRY_ZONE (Europe/Moscow по умолчанию), затем переводится в UTC. Уровень см→м передаётся только при указанном ECOSHIELD_LEVEL_DATUM. Без установленного нуля поста уровень опускается. Солёность ppt не приравнивается автоматически PSU. Обводнение нерестилища не выдумывается. Недостающие измерения остаются отсутствующими, история не генерируется для получения успешного ответа.
 
-// Прогноз нереста осетровых
-export interface SpawningForecast {
-  species: string;
-  targetZone: string;
-  calculationTime: string;
-  suitabilityIndex: number; // 0 - 100%
-  status: string;
-  windowStart: string;
-  windowEnd: string;
-  hydrologySummary: {
-    averageTemperatureC: number;
-    optimalTemperatureRange: string;
-    waterLevelCm: number;
-  };
-  limitingFactor: string;
-  patrolRecommendation: string;
-  modelVersion: string;
-}
-```
+Требуется минимум3 измерения температуры с уникальными датами, охватывающие48часов; последнее не старше24часов относительно issued_at. При недостаточных данных UI получает явную ошибку. Запрос использует ECOSHIELD_FORECAST_DATA_SOURCE, по умолчанию demo_synthetic: происхождение встроенных данных не доказано как реальные полевые наблюдения.
 
----
+В ответе сохраняются mode=scenario_conditions_forecast, isDemo=true, validationStatus, probability=null, trajectory, factors, missingData и warnings. UI показывает будущие даты и условия вместо процента вероятности нереста. Это не обученный биологический прогноз.
 
-### 1.3. Примеры запросов на JavaScript / TypeScript
+## Запуск отдельно
 
-#### А. Загрузка станций и отображение на карте (Leaflet / Mapbox)
-```javascript
-async function loadStations() {
-  try {
-    const response = await fetch('http://localhost:8080/api/stations');
-    if (!response.ok) throw new Error('Ошибка загрузки станций');
-    const stations = await response.json();
-    
-    stations.forEach(station => {
-      // Пример добавления маркера на карту Leaflet
-      const markerColor = station.status === 'CRITICAL' ? 'red' : 
-                          station.status === 'WARNING' ? 'orange' : 'green';
-      
-      const popupHtml = `
-        <b>${station.name}</b><br/>
-        Статус: ${station.status}<br/>
-        Кислород O₂: ${station.latestTelemetry?.dissolvedOxygenMgL ?? '—'} мг/л<br/>
-        Температура: ${station.latestTelemetry?.temperatureC ?? '—'} °C<br/>
-        Соленость: ${station.latestTelemetry?.salinityPpt ?? '—'} ‰
-      `;
-      // L.marker([station.latitude, station.longitude]).bindPopup(popupHtml).addTo(map);
-    });
-  } catch (error) {
-    console.error('Ошибка:', error);
-  }
-}
-```
+1. В отдельной папке / на отдельном сервере установить и запустить ранее переданный EcoShield AI по его README. GET /health должен вернуть audio_model_ready=true.
+2. В окружении Java задать ECOSHIELD_AI_SERVICE_URL и при необходимости часовой пояс/происхождение данных/ноль поста. .env.example содержит образец; файл .env сам по себе Spring Boot не загружает, значения задаются окружением запуска.
+3. Запустить веб-приложение с JDK25 и Maven. Открыть http://localhost:8080.
+4. Загрузить настоящий WAV и проверить modelVersion/analysisDetails, затем выключить Python и убедиться в ошибке503 без подмены ответа.
+5. Проверить /api/system/status: aiServiceAvailable отражает health реального сервиса.
 
-#### Б. Получение активных алертов для ленты уведомлений
-```javascript
-async function fetchActiveAlerts() {
-  const response = await fetch('http://localhost:8080/api/alerts?resolved=false');
-  const alerts = await response.json();
-  // Отрисовать карточки алертов в боковой панели инспектора
-  return alerts;
-}
+Для работы в интернете разверните Java с веб-интерфейсом на сервере, а модель — отдельным процессом/контейнером с приватным доступом для Java. Адрес GitHub хранит код, сам по себе не запускает серверные процессы. Публикация сервера и проверка реальных гидрофонов не входят в локальную интеграцию.
 
-// Квитирование (закрытие) алерта по нажатию кнопки «Отработано»
-async function resolveAlert(alertId) {
-  const response = await fetch(`http://localhost:8080/api/alerts/${alertId}/resolve`, {
-    method: 'PATCH'
-  });
-  return await response.json();
-}
-```
+## Проверка
 
-#### В. Получение истории телеметрии для графиков (Chart.js / Recharts)
-```javascript
-async function loadStationTelemetryChart(stationId) {
-  const response = await fetch(`http://localhost:8080/api/telemetry/water/station/${stationId}?limit=24`);
-  const history = await response.json();
-  
-  // Данные приходят от новых к старым, разворачиваем для оси времени
-  const sorted = history.reverse();
-  const labels = sorted.map(item => new Date(item.recordedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-  const oxygenData = sorted.map(item => item.dissolvedOxygenMgL);
-  const tempData = sorted.map(item => item.temperatureC);
-  
-  return { labels, oxygenData, tempData };
-}
-```
+Новые тесты проверяют HTTP контракт, отсутствие fallback, преобразование единиц и времени и UI поведение. Итоговый отчёт фактически выполненных проверок передаётся вместе с изменениями; прежние утверждения README о140тестах относятся к старой реализации.
 
-#### Г. Загрузка аудиозаписи с буя инспектором
-```javascript
-async function uploadAudioSample(file, stationId = 1) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('stationId', stationId);
+## Общий запуск
 
-  const response = await fetch('http://localhost:8080/api/audio/upload', {
-    method: 'POST',
-    body: formData
-  });
-
-  const result = await response.json();
-  if (result.alertGenerated) {
-    alert(`ВНИМАНИЕ! Обнаружен: ${result.detectedClass} (вероятность ${Math.round(result.confidence * 100)}%)`);
-  }
-  return result;
-}
-```
-
-#### Д. Запрос прогноза нереста для панели аналитики
-```javascript
-async function fetchSpawningForecast(species = 'Русский осётр', stationId = 1) {
-  const url = `http://localhost:8080/api/forecast/spawning?species=${encodeURIComponent(species)}&stationId=${stationId}`;
-  const response = await fetch(url);
-  return await response.json();
-}
-```
-
----
-
-## ЧАСТЬ 2. Интеграция с Python AI / Аналитикой (Участник 3)
-
-### 2.1. Архитектура взаимодействия
-Участник 3 разрабатывает легковесный HTTP-микросервис на **FastAPI** или **Flask**, слушающий порт `8000`.
-
-```
-                    ┌─────────────────────────┐
-                    │  Java Backend (:8080)   │
-                    └───────────┬─────────────┘
-                                │
-        1. POST /api/ai/audio/analyze (multipart audio)
-        2. POST /api/ai/forecast/spawning (JSON history)
-                                │
-                                ▼
-                    ┌─────────────────────────┐
-                    │ Python FastAPI (:8000)  │
-                    │   • Модель звука        │
-                    │   • Модель прогноза     │
-                    └─────────────────────────┘
-```
-
----
-
-### 2.2. Контракт эндпоинта 1: Анализ аудиозаписи
-
-- **Метод:** `POST`
-- **URL:** `http://localhost:8000/api/ai/audio/analyze`
-- **Вход:** `multipart/form-data`
-  - `file`: бинарный аудиофайл (`.wav`, `.mp3`)
-  - `station_id`: идентификатор станции
-- **Выходной JSON:**
-```json
-{
-  "status": "SUCCESS",
-  "detected_class": "boat_engine",
-  "confidence": 0.92,
-  "threat_level": "HIGH",
-  "details": {
-    "engine_type": "high_power_outboard",
-    "rpm_estimate": 4200,
-    "dominant_frequency_hz": 184.5
-  }
-}
-```
-
-Классы распознавания (`detected_class`):
-- `boat_engine` — лодочный мотор (угроза `HIGH` $\rightarrow$ Java генерирует алерт `ACOUSTIC_BOAT_DETECTED`).
-- `gunfire` — выстрел (угроза `CRITICAL` $\rightarrow$ Java генерирует алерт `ACOUSTIC_GUNFIRE`).
-- `fish_splash` — всплеск рыбы / тюленя (угроза `LOW`).
-- `ambient_noise` — шум ветра / волн / фон (угроза `NONE`).
-
----
-
-### 2.3. Контракт эндпоинта 2: Прогноз нереста осетровых
-
-- **Метод:** `POST`
-- **URL:** `http://localhost:8000/api/ai/forecast/spawning`
-- **Входной JSON:**
-```json
-{
-  "species": "Russian_Sturgeon",
-  "target_zone": "Volga_Delta_Damchik",
-  "hydrology_history": [
-    { "date": "2026-11-10", "temperature_c": 11.5, "salinity_ppt": 0.8, "water_level_cm": 250 },
-    { "date": "2026-11-11", "temperature_c": 12.1, "salinity_ppt": 0.7, "water_level_cm": 258 },
-    { "date": "2026-11-12", "temperature_c": 12.8, "salinity_ppt": 0.7, "water_level_cm": 265 }
-  ]
-}
-```
-
-- **Выходной JSON:**
-```json
-{
-  "status": "SUCCESS",
-  "suitability_index": 86.4,
-  "spawn_probability": "HIGH",
-  "optimal_window_start": "2026-11-15",
-  "optimal_window_end": "2026-11-22",
-  "limiting_factor": "Оптимальная температура (12.8°C) и достаточный уровень половодья",
-  "patrol_recommendation": "Выставить ночные посты инспекции на входе в рукав Дамчикский для защиты производителей от браконьерского лова",
-  "model_name": "CaspianSturgeonPredictor_v1"
-}
-```
-
----
-
-### 2.4. Готовый шаблон Python-микросервиса для Участника 3
-
-В репозиторий добавлен готовый рабочий скрипт:  
-**[`scripts/ai_service.py`](file:///home/dagai/hahaton/scripts/ai_service.py)**
-
-Участник 3 может запустить его за 1 минуту:
-```bash
-pip install fastapi uvicorn python-multipart
-python scripts/ai_service.py
-```
-Скрипт сразу готов к приёму запросов от Java-бэкенда и содержит заготовленные заглушки и интеграцию реальных ML-моделей.
-
----
-
-### 2.5. Механизм Fallback в Java-бэкенде
-
-Если Участник 3 еще дообучает модель или Python-сервис временно остановлен:
-- Java-бэкенд **не падает с ошибкой 500**.
-- Включается встроенный анализатор (`mock-ai-fallback: true`), который анализирует спектральные признаки и имя сэмпла, возвращая корректные ответы и создавая алерты.
-- Это гарантирует, что фронтендер и вся команда могут продолжать сборку и запись видеодемонстрации без блокировок.
-
+В корне репозитория: `docker compose up --build`. Веб-интерфейс http://localhost:8080; модель доступна Java по внутреннему адресу http://ai:8001. Первый запуск загружает Python зависимости и официальные веса; веса хранятся в отдельном Docker volume и не попадают в Git. Конфигурация Docker Compose требует отдельной проверки на машине с Docker; локальную связку проверяем через Java и Python процессы.
