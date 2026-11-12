@@ -149,34 +149,34 @@ function toggleSealMigrationLayer() {
   }
 }
 
+function getMarkerColor(status) {
+  if (status === "CRITICAL") return "#ef4444";
+  if (status === "WARNING") return "#f59e0b";
+  return "#10b981";
+}
+
 function renderMapMarkers(stations) {
   if (!mapInstance || !window.L) return;
 
   stations.forEach(st => {
-    const isCrit = st.status === "CRITICAL";
-    const isWarn = st.status === "WARNING";
-    const ringClass = isCrit ? "sonar-ring-crit" : (isWarn ? "sonar-ring-warn" : "sonar-ring-ok");
-    const coreClass = isCrit ? "sonar-core-crit" : (isWarn ? "sonar-core-warn" : "sonar-core-ok");
-
+    const color = getMarkerColor(st.status);
     const customIcon = L.divIcon({
       className: "custom-sonar-pin",
       html: `
         <div class="sonar-marker-wrap">
-          <div class="sonar-ring ${ringClass}"></div>
-          <div class="sonar-core ${coreClass}">${isCrit ? '!' : ''}</div>
+          <div class="sonar-ring" style="border: 2px solid ${color};"></div>
+          <div class="sonar-core" style="background-color: ${color};"></div>
         </div>
       `,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
     });
 
-    const statusBadge = isCrit 
-      ? '<span style="background: #ffffff; color: #000000; font-weight: 800; padding: 2px 6px; border-radius: 3px; font-size: 10px;">ТРЕВОГА</span>' 
-      : (isWarn ? '<span style="background: #666666; color: #ffffff; font-weight: 700; padding: 2px 6px; border-radius: 3px; font-size: 10px;">ВНИМАНИЕ</span>' : '<span style="border: 1px solid #444; color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">НОРМА</span>');
+    const statusBadge = `<span style="background: ${color}; color: ${st.status === 'WARNING' ? '#000000' : '#ffffff'}; font-weight: 800; padding: 2px 6px; font-size: 10px;">${st.status}</span>`;
 
     const popupContent = `
       <div class="tactical-popup">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #000000; padding-bottom: 4px;">
           <div class="tp-title">${st.name}</div>
           ${statusBadge}
         </div>
