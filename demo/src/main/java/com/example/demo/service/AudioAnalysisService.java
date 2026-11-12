@@ -55,6 +55,7 @@ public class AudioAnalysisService {
         String hydrophoneModel;
         double ambientNoiseDb;
         String defaultSampleFile;
+        String currentSampleFile;
         boolean sentryActive;
 
         DeviceInternalState(String deviceId, String name, Long stationId, String stationCode, String stationName,
@@ -71,6 +72,7 @@ public class AudioAnalysisService {
             this.hydrophoneModel = hydrophoneModel;
             this.ambientNoiseDb = ambientNoiseDb;
             this.defaultSampleFile = defaultSampleFile;
+            this.currentSampleFile = defaultSampleFile;
             this.sentryActive = true;
         }
     }
@@ -89,7 +91,7 @@ public class AudioAnalysisService {
         deviceRegistry.put("DEV-DAM-01", new DeviceInternalState(
             "DEV-DAM-01", "Гидроакустический комплекс ГАК-Дамчик-1",
             1L, "BUOY-DAM-01", "Буй Дамчикский №1",
-            "ONLINE", 94, "-64 dBm (LoRaWAN/4G)", "Cetacean Research C57 Dual-Array", 38.2, "boat_engine_outboard.wav"
+            "ONLINE", 94, "-64 dBm (LoRaWAN/4G)", "Cetacean Research C57 Dual-Array", 38.2, "ambient_caspian_waves.wav"
         ));
         deviceRegistry.put("DEV-TRE-02", new DeviceInternalState(
             "DEV-TRE-02", "Биоакустический регистратор БАР-Трёхизбинка-2",
@@ -99,12 +101,12 @@ public class AudioAnalysisService {
         deviceRegistry.put("DEV-CASP-03", new DeviceInternalState(
             "DEV-CASP-03", "Дальнобойный гидрофон ВКМСК-145",
             3L, "BUOY-CASP-03", "Морской буй 'Северный Каспий' №3",
-            "ONLINE", 91, "-58 dBm (Спутниковый канал Иридиум)", "Teledyne RESON TC4032 Marine", 46.5, "boat_engine_outboard.wav"
+            "ONLINE", 91, "-58 dBm (Спутниковый канал Иридиум)", "Teledyne RESON TC4032 Marine", 46.5, "ambient_caspian_waves.wav"
         ));
         deviceRegistry.put("DEV-AGR-04", new DeviceInternalState(
             "DEV-AGR-04", "Акустический регистратор Кизляр-Аграхан-4",
             4L, "BUOY-AGR-04", "Станция 'Аграханский залив' №4",
-            "ONLINE", 82, "-76 dBm (LoRaWAN)", "Cetacean SQ26-08 Acoustic Array", 39.5, "poaching_gunfire_shot.wav"
+            "ONLINE", 82, "-76 dBm (LoRaWAN)", "Cetacean SQ26-08 Acoustic Array", 39.5, "ambient_caspian_waves.wav"
         ));
         deviceRegistry.put("DEV-TUL-05", new DeviceInternalState(
             "DEV-TUL-05", "Шельфовый гидроакустический пост МГ-2 Тюлений",
@@ -157,8 +159,11 @@ public class AudioAnalysisService {
             };
         }
 
+        // Live acoustic state update on this field hydrophone
+        dev.currentSampleFile = sampleName;
+
         // Classification: query Python AI first, fallback to heuristic if Python is unavailable
-        byte[] audioBytes = getDeviceAudioStream(deviceId);
+        byte[] audioBytes = getDeviceAudioStream(deviceId, soundScenario);
         AiInferenceResult pyResult = queryPythonAiService(sampleName, audioBytes, station.getId());
 
         String detectedClass;
@@ -242,18 +247,44 @@ public class AudioAnalysisService {
     }
 
     public byte[] getDeviceAudioStream(String deviceId) {
+        return getDeviceAudioStream(deviceId, null);
+    }
+
+    public byte[] getDeviceAudioStream(String deviceId, String scenario) {
         DeviceInternalState dev = deviceRegistry.get(deviceId);
-        String filename = (dev != null) ? dev.defaultSampleFile : "boat_engine_outboard.wav";
+        String filename;
+
+        if (scenario != null && !scenario.isBlank()) {
+            filename = switch (scenario.toLowerCase()) {
+                case "boat", "motor", "лодка" -> "boat_engine_outboard.wav";
+                case "shot", "gun", "выстрел" -> "poaching_gunfire_shot.wav";
+                case "splash", "fish", "рыба" -> "sturgeon_water_splash.wav";
+                case "ambient", "waves", "шум" -> "ambient_caspian_waves.wav";
+                default -> (dev != null && dev.currentSampleFile != null) ? dev.currentSampleFile : "ambient_caspian_waves.wav";
+            };
+            if (dev != null) {
+                dev.currentSampleFile = filename;
+            }
+        } else {
+            filename = (dev != null && dev.currentSampleFile != null) 
+                ? dev.currentSampleFile 
+                : (dev != null ? dev.defaultSampleFile : "ambient_caspian_waves.wav");
+        }
 
         // Try reading from file path or classpath
         try {
-            Path p = Paths.get("demo/src/main/resources/static/samples", filename);
-            if (Files.exists(p)) {
-                return Files.readAllBytes(p);
-            }
-            Path p2 = Paths.get("data/audio", filename);
-            if (Files.exists(p2)) {
-                return Files.readAllBytes(p2);
+            Path[] candidatePaths = {
+                Paths.get("demo/src/main/resources/static/samples", filename),
+                Paths.get("src/main/resources/static/samples", filename),
+                Paths.get("demo/target/classes/static/samples", filename),
+                Paths.get("target/classes/static/samples", filename),
+                Paths.get("data/audio", filename),
+                Paths.get("../data/audio", filename)
+            };
+            for (Path p : candidatePaths) {
+                if (Files.exists(p) && Files.size(p) > 0) {
+                    return Files.readAllBytes(p);
+                }
             }
             ClassPathResource cp = new ClassPathResource("static/samples/" + filename);
             if (cp.exists()) {

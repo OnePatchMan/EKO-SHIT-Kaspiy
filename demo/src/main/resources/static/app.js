@@ -388,9 +388,7 @@ function onHydrophoneSelected(deviceId) {
   updateDeviceTelemetryView(deviceId);
 
   if (isStreamingAudio) {
-    const player = document.getElementById("device-audio-player");
-    player.src = `${API_BASE}/api/audio/devices/${deviceId}/stream?t=${Date.now()}`;
-    player.play().catch(e => console.log("Stream play interrupted"));
+    startDeviceAudioStream();
   }
 }
 
@@ -494,16 +492,16 @@ async function executeDeviceCapture(deviceId, scenario, isAuto = false) {
   resultBox.innerHTML = `<div>⏳ ${isAuto ? '🤖 [Авто-дозор]' : '📡'} Захват гидроакустического потока с <strong>${escapeHtml(devName)}</strong> и спектральный анализ ИИ...</div>`;
 
   try {
-    const res = await fetch(`${API_BASE}/api/audio/devices/${deviceId}/capture?scenario=${scenario}`, {
+    const res = await fetch(`${API_BASE}/api/audio/devices/${deviceId}/capture?scenario=${encodeURIComponent(scenario)}`, {
       method: "POST"
     });
     if (!res.ok) throw new Error("Ошибка анализа гидроакустического сигнала");
     const data = await res.json();
 
-    const streamUrl = `${API_BASE}/api/audio/devices/${deviceId}/stream?t=${Date.now()}`;
+    const streamUrl = `${API_BASE}/api/audio/devices/${deviceId}/stream?scenario=${encodeURIComponent(scenario)}&t=${Date.now()}`;
     displayAudioResult(data, streamUrl);
 
-    startDeviceAudioStream();
+    startDeviceAudioStream(scenario);
     loadAlerts(currentAlertFilterResolved);
     loadStations();
   } catch (err) {
@@ -525,18 +523,35 @@ function toggleDeviceLiveStream() {
     btn.innerText = "▶ Слушать эфир гидрофона";
     stopVisualizerCanvas();
   } else {
-    startDeviceAudioStream();
+    startDeviceAudioStream(currentSoundScenario);
   }
 }
 
-function startDeviceAudioStream() {
+function startDeviceAudioStream(scenario = null) {
   const player = document.getElementById("device-audio-player");
   const btn = document.getElementById("btn-toggle-stream");
+  const dev = devicesCache[currentSelectedDeviceId];
+  const streamTitle = document.getElementById("stream-dev-title");
 
-  player.src = `${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/stream?t=${Date.now()}`;
+  const scen = scenario || currentSoundScenario || "";
+  const scenParam = scen ? `&scenario=${encodeURIComponent(scen)}` : "";
+  const url = `${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/stream?t=${Date.now()}${scenParam}`;
+
+  player.src = url;
+  player.volume = 0.85;
   player.play().then(() => {
     isStreamingAudio = true;
     if (btn) btn.innerText = "⏹ Остановить эфир";
+    if (streamTitle && dev) {
+      const scenNames = {
+        boat: "Мотор лодки («Байда»)",
+        shot: "Выстрел браконьера",
+        splash: "Плеск рыбы / Нерест",
+        ambient: "Фоновый шум волн"
+      };
+      const label = scenNames[scen] || "Гидроакустический эфир";
+      streamTitle.innerText = `${dev.name} [📡 ${label}]`;
+    }
     startVisualizerCanvas();
   }).catch(e => {
     console.log("Audio play allowed on user interaction:", e);
@@ -803,8 +818,9 @@ function displayAudioResult(data, audioUrl = null) {
       </span>
     </div>
     ${audioUrl ? `
-      <div style="margin-bottom: 8px;">
-        <audio id="result-audio-player" controls autoplay src="${audioUrl}" style="width: 100%; height: 32px;" onplay="startVisualizerCanvas()" onpause="stopVisualizerCanvas()"></audio>
+      <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.25); padding: 6px 12px; border-radius: 6px;">
+        <span style="font-size: 12px; color: #94a3b8;">🎧 Запись инцидента с гидрофона:</span>
+        <audio id="result-audio-player" controls src="${audioUrl}" style="height: 28px;"></audio>
       </div>
     ` : ''}
     <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
@@ -813,14 +829,6 @@ function displayAudioResult(data, audioUrl = null) {
       ${data.alertGenerated ? `<span style="color: #ef4444; font-weight: bold;">🚨 Сформировано оперативное предупреждение инспекции на карте!</span>` : `<span style="color: #10b981;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
     </div>
   `;
-
-  if (audioUrl) {
-    const audioEl = document.getElementById("result-audio-player");
-    if (audioEl) {
-      audioEl.volume = 0.6;
-      audioEl.play().catch(e => console.log("Result autoplay:", e));
-    }
-  }
 }
 
 // ==========================================

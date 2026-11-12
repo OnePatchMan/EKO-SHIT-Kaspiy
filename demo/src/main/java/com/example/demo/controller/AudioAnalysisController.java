@@ -42,8 +42,10 @@ public class AudioAnalysisController {
     }
 
     @GetMapping("/devices/{deviceId}/stream")
-    public ResponseEntity<byte[]> streamDeviceAudio(@PathVariable String deviceId) {
-        byte[] audioData = audioAnalysisService.getDeviceAudioStream(deviceId);
+    public ResponseEntity<byte[]> streamDeviceAudio(
+            @PathVariable String deviceId,
+            @RequestParam(value = "scenario", required = false) String scenario) {
+        byte[] audioData = audioAnalysisService.getDeviceAudioStream(deviceId, scenario);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "audio/wav")
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + deviceId + "_stream.wav\"")
