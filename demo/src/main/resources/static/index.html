@@ -48,6 +48,7 @@
             <span class="legend-item"><span class="dot dot-normal"></span> Штатно</span>
             <span class="legend-item"><span class="dot dot-warning"></span> Внимание</span>
             <span class="legend-item"><span class="dot dot-critical"></span> Тревога</span>
+            <button class="btn btn-xs btn-outline btn-seal-layer active" id="btn-toggle-seals" onclick="toggleSealMigrationLayer()" title="Включить/выключить отображение миграционного пути тюленей">🦭 Путь тюленей (Pusa caspica)</button>
           </div>
         </div>
         <div id="map" class="map-view"></div>
@@ -98,7 +99,7 @@
       <section class="card tools-card">
         <div class="tabs-nav">
           <button class="tab-btn active" onclick="switchTab('tab-audio')">📡 Гидрофоны ООПТ</button>
-          <button class="tab-btn" onclick="switchTab('tab-forecast')">🐟 Прогноз нереста</button>
+          <button class="tab-btn" onclick="switchTab('tab-forecast')">🦭 Миграция тюленей и нерест</button>
           <button class="tab-btn" onclick="switchTab('tab-simulator')">🧪 IoT-Симулятор</button>
         </div>
 
@@ -215,12 +216,9 @@
             <audio id="device-audio-player" style="display: none;"></audio>
           </div>
 
-          <!-- Direct Mic Capture & Offline Archive -->
+          <!-- Sea Hydrophones Status & Offline Archive -->
           <div class="aux-audio-row">
-            <button class="btn btn-sm btn-outline" id="btn-mic-record" onclick="toggleMicRecording()">
-              🎙️ Тест живого микрофона ноутбука (3 сек)
-            </button>
-            <span id="mic-status-hint" class="mic-hint"></span>
+            <span class="mic-hint">🌊 Режим работы: Прямой цифровой опрос морских донных гидрофонов ООПТ</span>
 
             <details class="manual-upload-details">
               <summary>📁 Архивные оффлайн-записи (.wav)</summary>
@@ -236,24 +234,27 @@
         </div>
 
         <div class="tab-content" id="tab-forecast">
-          <h3 class="tab-heading">Предиктивный гидробиологический прогноз</h3>
-          <p class="tab-desc">Сценарное моделирование нерестового хода ценных видов рыб на основе гидрологии дельты Волги.</p>
+          <h3 class="tab-heading">🦭 Прогноз миграции каспийского тюленя и нереста осетровых</h3>
+          <p class="tab-desc">ИИ-моделирование сезонной миграции эндемика Красной книги РФ (*Pusa caspica*) и нерестового хода осетровых на основе гидрологической телеметрии Каспия.</p>
 
           <div class="forecast-controls">
             <div class="form-row">
-              <label for="species-select">Целевой вид:</label>
+              <label for="species-select">Целевой вид / Объект охраны:</label>
               <select id="species-select" onchange="loadForecast()">
-                <option value="Русский осётр (Acipenser gueldenstaedtii)">Русский осётр (Acipenser gueldenstaedtii)</option>
-                <option value="Севрюга (Acipenser stellatus)">Севрюга (Acipenser stellatus)</option>
-                <option value="Белуга (Huso huso)">Белуга (Huso huso)</option>
+                <option value="Каспийский тюлень (Pusa caspica) — Сезонная миграция" selected>🦭 Каспийский тюлень (Pusa caspica) — Сезонная миграция</option>
+                <option value="Русский осётр (Acipenser gueldenstaedtii)">🐟 Русский осётр (Acipenser gueldenstaedtii)</option>
+                <option value="Севрюга (Acipenser stellatus)">🐟 Севрюга (Acipenser stellatus)</option>
+                <option value="Белуга (Huso huso)">🐟 Белуга (Huso huso)</option>
               </select>
             </div>
             <div class="form-row">
-              <label for="forecast-station-select">Зона ООПТ:</label>
+              <label for="forecast-station-select">Зона ООПТ / Станция:</label>
               <select id="forecast-station-select" onchange="loadForecast()">
-                <option value="1">Дамчикский участок (Волго-Каспийский бассейн)</option>
-                <option value="2">Трёхизбинский участок (Тишковский рукав)</option>
+                <option value="5" selected>Морской буй 'Остров Тюлений' №5 (Ключевое лежбище)</option>
+                <option value="3">Морской буй 'Северный Каспий' ВКМСК 145 км (Миграционный фарватер)</option>
                 <option value="4">Аграханский залив (Дагестанский заповедник)</option>
+                <option value="1">Дамчикский участок (Дельта Волги)</option>
+                <option value="2">Трёхизбинский участок (Дельта Волги)</option>
               </select>
             </div>
           </div>

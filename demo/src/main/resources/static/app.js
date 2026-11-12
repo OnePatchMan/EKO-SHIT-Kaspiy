@@ -37,6 +37,94 @@ function initMap() {
     maxZoom: 18,
     attribution: "© OpenStreetMap ООПТ Каспий"
   }).addTo(mapInstance);
+
+  initSealMigrationLayer();
+}
+
+let sealLayerGroup = null;
+let sealLayerVisible = true;
+
+function initSealMigrationLayer() {
+  if (!mapInstance || !window.L) return;
+
+  sealLayerGroup = L.layerGroup();
+
+  // Маршрут осенней миграции каспийского тюленя (Средний Каспий -> о. Тюлений -> Северный Каспий)
+  const sealPathCoords = [
+    [42.85, 47.60], // Дербент / Избербаш (глубоководный нагул)
+    [43.85, 47.65], // Аграханский залив
+    [44.50, 47.52], // Остров Тюлений (Буй №5 - ключевое лежбище)
+    [45.45, 47.95], // ВКМСК 145 км (Буй №3 - миграционный фарватер)
+    [45.75, 48.40], // Авандельта Волги / Зона ледообразования
+    [45.90, 49.10]  // Северо-Восточный шельф
+  ];
+
+  const sealPolyline = L.polyline(sealPathCoords, {
+    color: "#38bdf8",
+    weight: 4,
+    opacity: 0.85,
+    dashArray: "8, 8",
+    lineJoin: "round"
+  });
+
+  sealPolyline.bindPopup(`
+    <div style="font-family: sans-serif; min-width: 220px; color: #0f172a;">
+      <h4 style="margin: 0 0 4px 0; color: #0284c7;">🦭 Миграционный коридор каспийского тюленя (Pusa caspica)</h4>
+      <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">Эндемик Каспия • Красная книга РФ • МСОП (Endangered)</div>
+      <div style="font-size: 12px; line-height: 1.4;">
+        <strong>Сезон:</strong> Октябрь — Декабрь<br/>
+        <strong>Цель миграции:</strong> Выход на ледовые поля Северного Каспия для размножения и линьки.<br/>
+        <strong>Ключевая угроза:</strong> Запутывание в браконьерских крупноячеистых сетях и столкновения с байдами.<br/>
+        <strong>Защита:</strong> Акустический дозор буев №5 (о. Тюлений) и №3 (ВКМСК).
+      </div>
+    </div>
+  `);
+
+  sealLayerGroup.addLayer(sealPolyline);
+
+  // Опорные точки на пути тюленей
+  const sealPoints = [
+    {
+      coords: [44.50, 47.52],
+      title: "🦭 Лежбище: Остров Тюлений",
+      desc: "Крупнейшее осеннее лежбище нерпы. Охраняется морским буем DEV-TUL-05."
+    },
+    {
+      coords: [45.45, 47.95],
+      title: "⚠️ Фарватер ВКМСК 145 км",
+      desc: "Опасная зона пересечения судового хода и миграционного пути тюленей. Высокий риск браконьерских сетей!"
+    }
+  ];
+
+  sealPoints.forEach(p => {
+    const sealMarker = L.marker(p.coords, {
+      icon: L.divIcon({
+        className: "seal-pin",
+        html: `<div style="background: rgba(14, 165, 233, 0.95); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; box-shadow: 0 0 10px #38bdf8;">🦭</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      })
+    });
+    sealMarker.bindPopup(`<strong>${p.title}</strong><br/><small>${p.desc}</small>`);
+    sealLayerGroup.addLayer(sealMarker);
+  });
+
+  sealLayerGroup.addTo(mapInstance);
+}
+
+function toggleSealMigrationLayer() {
+  const btn = document.getElementById("btn-toggle-seals");
+  if (!mapInstance || !sealLayerGroup) return;
+
+  if (sealLayerVisible) {
+    mapInstance.removeLayer(sealLayerGroup);
+    sealLayerVisible = false;
+    if (btn) btn.classList.remove("active");
+  } else {
+    mapInstance.addLayer(sealLayerGroup);
+    sealLayerVisible = true;
+    if (btn) btn.classList.add("active");
+  }
 }
 
 function getMarkerColor(status) {

@@ -44,6 +44,49 @@ public class ForecastService {
         double avgOxygen = recent.stream().mapToDouble(t -> t.getDissolvedOxygenMgL() != null ? t.getDissolvedOxygenMgL() : 8.0).average().orElse(7.8);
         double avgLevel = recent.stream().mapToDouble(t -> t.getWaterLevelCm() != null ? t.getWaterLevelCm() : 250.0).average().orElse(260.0);
 
+        // Check if forecast is requested for Caspian Seal (Pusa caspica)
+        boolean isSeal = targetSpecies.toLowerCase().contains("тюлен") 
+                      || targetSpecies.toLowerCase().contains("pusa")
+                      || targetSpecies.toLowerCase().contains("нерп");
+
+        if (isSeal) {
+            // Caspian Seal (Pusa caspica) Autumn Migration Model
+            // Peak migration occurs in Nov-Dec from Middle Caspian to shallow North Caspian ice fields
+            double sealScore = 65.0;
+            if (avgSalinity > 5.0) sealScore += 18.0; // Marine preference
+            if (avgTemp < 13.0 && avgTemp > 3.0) sealScore += 14.0; // Temperature trigger for northward run
+            if (station != null && (station.getId() == 5L || station.getId() == 3L || station.getId() == 4L)) {
+                sealScore += 15.0; // Epicenters: Ostrov Tyuleniy, VKMSK, Agrakhan
+            }
+
+            sealScore = Math.max(20.0, Math.min(96.5, sealScore));
+
+            String sealStatus = sealScore >= 75.0 ? "MIGRATION_PEAK_HIGH_RISK" : "TRANSIT_MIGRATION";
+            String sealLimiting = "Пик сезонной миграции каспийского тюленя на северные лежбища. Критическая угроза: браконьерские крупноячеистые сети и скоростные байды.";
+            String sealRec = "🚨 ПОВЫШЕННЫЙ РЕЖИМ ОХРАНЫ ЭНДЕМИКА: Направить рейдовые группы по миграционному коридору 'Аграхан — Остров Тюлений — ВКМСК'. Провести траление акватории для ликвидации браконьерских сетей.";
+
+            Map<String, Object> sealSummary = new HashMap<>();
+            sealSummary.put("averageTemperatureC", Math.round(avgTemp * 10.0) / 10.0);
+            sealSummary.put("averageSalinityPpt", Math.round(avgSalinity * 10.0) / 10.0);
+            sealSummary.put("averageOxygenMgL", Math.round(avgOxygen * 10.0) / 10.0);
+            sealSummary.put("migrationCorridor", "Средний Каспий -> Остров Тюлений -> Северный Каспий (ВКМСК)");
+            sealSummary.put("conservationStatus", "Красная книга РФ, МСОП (Endangered)");
+
+            return new SpawningForecastResponse(
+                targetSpecies,
+                targetZone,
+                LocalDateTime.now(),
+                Math.round(sealScore * 10.0) / 10.0,
+                sealStatus,
+                LocalDate.now(),
+                LocalDate.now().plusDays(21),
+                sealSummary,
+                sealLimiting,
+                sealRec,
+                "Caspian Seal Migration AI (Pusa caspica Bio-Predictor v1.0)"
+            );
+        }
+
         // Biological suitability algorithm for Acipenser gueldenstaedtii:
         // - Optimum temperature: 11 - 15°C
         // - Optimum salinity for delta spawning runs: < 1.5 ppt
