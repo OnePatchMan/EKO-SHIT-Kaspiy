@@ -360,32 +360,71 @@ function setScenario(scen) {
   if (activeBtn) activeBtn.classList.add("active");
 }
 
-async function captureFromSelectedDevice() {
+let autoSentryIntervalId = null;
+
+function toggleAutonomousMonitoring(enable) {
+  const label = document.getElementById("sentry-status-label");
+  if (enable) {
+    if (label) label.innerHTML = `🟢 <strong style="color: #10b981;">Автономный дозор: АКТИВЕН</strong> (авто-сканирование гидрофонов)`;
+    runAutonomousScanCycle();
+    autoSentryIntervalId = setInterval(runAutonomousScanCycle, 14000);
+  } else {
+    if (label) label.innerText = "🛡️ Автономный дозор: ВЫКЛ (ручной режим проверки)";
+    if (autoSentryIntervalId) {
+      clearInterval(autoSentryIntervalId);
+      autoSentryIntervalId = null;
+    }
+  }
+}
+
+async function runAutonomousScanCycle() {
+  const deviceKeys = Object.keys(devicesCache);
+  if (deviceKeys.length === 0) return;
+  const devId = deviceKeys[Math.floor(Math.random() * deviceKeys.length)];
+  const scenarios = ["boat", "shot", "ambient", "splash"];
+  const scen = scenarios[Math.floor(Math.random() * scenarios.length)];
+
+  currentSelectedDeviceId = devId;
+  const selectEl = document.getElementById("hydrophone-select");
+  if (selectEl) selectEl.value = devId;
+  updateDeviceTelemetryView(devId);
+
+  await executeDeviceCapture(devId, scen, true);
+}
+
+async function triggerDirectTest(scenario) {
+  currentSoundScenario = scenario;
+  await executeDeviceCapture(currentSelectedDeviceId, scenario, false);
+}
+
+async function executeDeviceCapture(deviceId, scenario, isAuto = false) {
   const resultBox = document.getElementById("audio-result");
-  const dev = devicesCache[currentSelectedDeviceId];
-  const devName = dev ? dev.name : currentSelectedDeviceId;
+  const dev = devicesCache[deviceId];
+  const devName = dev ? dev.name : deviceId;
 
   resultBox.classList.remove("hidden");
-  resultBox.innerHTML = `<div>⏳ Захват цифрового гидроакустического потока с <strong>${escapeHtml(devName)}</strong> и спектральный анализ ИИ...</div>`;
+  resultBox.innerHTML = `<div>⏳ ${isAuto ? '🤖 [Авто-дозор]' : '📡'} Захват гидроакустического потока с <strong>${escapeHtml(devName)}</strong> и спектральный анализ ИИ...</div>`;
 
   try {
-    const res = await fetch(`${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/capture?scenario=${currentSoundScenario}`, {
+    const res = await fetch(`${API_BASE}/api/audio/devices/${deviceId}/capture?scenario=${scenario}`, {
       method: "POST"
     });
     if (!res.ok) throw new Error("Ошибка анализа гидроакустического сигнала");
     const data = await res.json();
 
-    const streamUrl = `${API_BASE}/api/audio/devices/${currentSelectedDeviceId}/stream?t=${Date.now()}`;
+    const streamUrl = `${API_BASE}/api/audio/devices/${deviceId}/stream?t=${Date.now()}`;
     displayAudioResult(data, streamUrl);
 
-    // Auto-play the captured stream in the player
     startDeviceAudioStream();
-
     loadAlerts(currentAlertFilterResolved);
     loadStations();
   } catch (err) {
     resultBox.innerHTML = `<div style="color: #ef4444;">Ошибка захвата потока: ${err.message}</div>`;
   }
+}
+
+async function captureFromSelectedDevice() {
+  await executeDeviceCapture(currentSelectedDeviceId, currentSoundScenario, false);
 }
 
 function toggleDeviceLiveStream() {

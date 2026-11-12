@@ -14,3 +14,4 @@ public record RecordingDeviceDto(
     String streamUrl,
     boolean sentryActive
 ) {}
+

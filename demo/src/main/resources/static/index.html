@@ -106,14 +106,28 @@
           <div class="tab-header-row">
             <div>
               <h3 class="tab-heading">📡 Полевые регистрирующие гидрофоны ООПТ</h3>
-              <p class="tab-desc">Прямой доступ к гидроакустическим комплексам на заповедных территориях. Непрерывный анализ акустического спектра для детекции браконьерских лодок («байд») и выстрелов.</p>
+              <p class="tab-desc">Комплекс непрерывного гидроакустического мониторинга заповедных акваторий. Система <strong>автономно распознаёт угрозы</strong> в звуковом потоке без необходимости загружать файлы вручную.</p>
+            </div>
+          </div>
+
+          <!-- Mode Banner: Autonomous Sentry vs Manual Testing -->
+          <div class="sentry-banner">
+            <div class="sentry-toggle-group">
+              <label class="switch-container">
+                <input type="checkbox" id="auto-sentry-toggle" onchange="toggleAutonomousMonitoring(this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+              <div>
+                <strong id="sentry-status-label" class="sentry-active-title">🛡️ Автономный дозор: ВЫКЛ (ручной режим проверки)</strong>
+                <div class="sentry-subtitle">Включите для фонового авто-сканирования эфира гидрофонов каждые 12 секунд</div>
+              </div>
             </div>
           </div>
 
           <!-- Device Card & Telemetry -->
           <div class="device-panel">
             <div class="device-select-bar">
-              <label for="hydrophone-select"><strong>Гидроакустический комплекс:</strong></label>
+              <label for="hydrophone-select"><strong>Выбор гидроакустического комплекса ООПТ:</strong></label>
               <select id="hydrophone-select" onchange="onHydrophoneSelected(this.value)">
                 <option value="DEV-CASP-03">DEV-CASP-03 — Дальнобойный гидрофон ВКМСК-145 (Северный Каспий)</option>
                 <option value="DEV-DAM-01">DEV-DAM-01 — ГАК-Дамчик-1 (Дамчикский участок ООПТ)</option>
@@ -125,16 +139,16 @@
 
             <div class="device-telemetry-grid">
               <div class="telemetry-pill">
-                <span class="tp-label">Статус комплекса:</span>
+                <span class="tp-label">Статус буя:</span>
                 <span class="tp-val text-online" id="dev-status">● ONLINE</span>
-                <button class="btn btn-xs btn-outline" id="btn-toggle-sentry" onclick="toggleDeviceSentry()" title="Переключить режим охраны">Сторож: ВКЛ</button>
+                <button class="btn btn-xs btn-outline" id="btn-toggle-sentry" onclick="toggleDeviceSentry()" title="Переключить сторожевой режим">Сторож: ВКЛ</button>
               </div>
               <div class="telemetry-pill">
                 <span class="tp-label">АКБ буя:</span>
                 <span class="tp-val" id="dev-battery">🔋 91%</span>
               </div>
               <div class="telemetry-pill">
-                <span class="tp-label">Телеметрия/Связь:</span>
+                <span class="tp-label">Канал связи:</span>
                 <span class="tp-val" id="dev-signal">📶 -58 dBm (Иридиум)</span>
               </div>
               <div class="telemetry-pill">
@@ -148,21 +162,38 @@
             </div>
           </div>
 
-          <!-- Scenario Simulation & Direct Device Stream Capture -->
+          <!-- Quick Test & Demonstration Panel -->
           <div class="capture-section">
-            <div class="scenario-selector-row">
-              <span class="scenario-title">Оперативный акустический фон в акватории датчика:</span>
-              <div class="scenario-pills">
-                <button class="btn btn-scen active" id="scen-boat" onclick="setScenario('boat')">🚤 Мотор байды</button>
-                <button class="btn btn-scen" id="scen-shot" onclick="setScenario('shot')">💥 Выстрел</button>
-                <button class="btn btn-scen" id="scen-splash" onclick="setScenario('splash')">🐟 Плеск рыбы</button>
-                <button class="btn btn-scen" id="scen-ambient" onclick="setScenario('ambient')">🌊 Шум волн</button>
-              </div>
-            </div>
-
-            <div class="capture-action-row">
-              <button class="btn btn-primary btn-capture" onclick="captureFromSelectedDevice()">
-                📡 Захватить и проанализировать аудиопоток с устройства
+            <span class="scenario-title">🎮 <strong>Пульт ручной проверки и демонстрации для жюри:</strong></span>
+            <p class="form-hint" style="margin-bottom: 8px;">Нажмите кнопку нужного события — система моментально смоделирует появление звука на гидрофоне, выполнит нейросетевой анализ, окрасит карту в тревожный цвет и включит аудиопоток:</p>
+            <div class="quick-test-grid">
+              <button class="btn btn-test-action btn-boat" onclick="triggerDirectTest('boat')">
+                <span class="btn-icon">🚤</span>
+                <div class="btn-text-wrap">
+                  <strong>Проверить: Мотор байды</strong>
+                  <small>Детекция браконьера (94% High Threat)</small>
+                </div>
+              </button>
+              <button class="btn btn-test-action btn-shot" onclick="triggerDirectTest('shot')">
+                <span class="btn-icon">💥</span>
+                <div class="btn-text-wrap">
+                  <strong>Проверить: Выстрел</strong>
+                  <small>Оружейный залп (89% Critical Threat)</small>
+                </div>
+              </button>
+              <button class="btn btn-test-action btn-fish" onclick="triggerDirectTest('splash')">
+                <span class="btn-icon">🐟</span>
+                <div class="btn-text-wrap">
+                  <strong>Проверить: Плеск рыбы</strong>
+                  <small>Нерестовый ход осетровых (Норма)</small>
+                </div>
+              </button>
+              <button class="btn btn-test-action btn-ambient" onclick="triggerDirectTest('ambient')">
+                <span class="btn-icon">🌊</span>
+                <div class="btn-text-wrap">
+                  <strong>Проверить: Шум волн</strong>
+                  <small>Фоновые волны Каспия (Норма)</small>
+                </div>
               </button>
             </div>
           </div>
@@ -184,15 +215,15 @@
             <audio id="device-audio-player" style="display: none;"></audio>
           </div>
 
-          <!-- Direct Mic Capture & Offline Upload Collapsible -->
+          <!-- Direct Mic Capture & Offline Archive -->
           <div class="aux-audio-row">
             <button class="btn btn-sm btn-outline" id="btn-mic-record" onclick="toggleMicRecording()">
-              🎙️ Захват с физического микрофона/терминала (3 сек)
+              🎙️ Тест живого микрофона ноутбука (3 сек)
             </button>
             <span id="mic-status-hint" class="mic-hint"></span>
 
             <details class="manual-upload-details">
-              <summary>📁 Загрузить файл с диска (.wav)</summary>
+              <summary>📁 Архивные оффлайн-записи (.wav)</summary>
               <div class="manual-upload-box">
                 <input type="file" id="audio-file-input" accept="audio/*" class="file-input">
                 <button class="btn btn-sm btn-primary" onclick="uploadAudio()">Анализ файла</button>
