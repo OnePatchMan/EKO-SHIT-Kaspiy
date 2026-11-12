@@ -3,32 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Эко-Щит Каспия — Цифровой помощник инспектора ООПТ</title>
+  <title>Эко-Щит Каспия — Ситуационный центр ООПТ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Header -->
+  <!-- Header: Ситуационный центр ООПТ -->
   <header class="header">
     <div class="header-brand">
       <div class="logo-shield">🛡️</div>
       <div>
-        <h1 class="header-title">ЭКО-ЩИТ КАСПИЯ</h1>
-        <p class="header-subtitle">ИИ-система раннего предупреждения для дельтовых и морских ООПТ</p>
+        <h1 class="header-title">ЭКО-ЩИТ КАСПИЯ <span class="header-title-badge">OPS v2.4</span></h1>
+        <p class="header-subtitle"><span class="pulse-dot"></span> Ситуационный центр ООПТ • Северный Каспий и Дельта Волги</p>
       </div>
     </div>
     <div class="header-stats">
+      <div class="stat-pill clock-pill">
+        <span class="clock-icon">⏱</span>
+        <span id="live-caspian-clock" class="clock-val">--:--:-- КАСПИЙ (UTC+4)</span>
+      </div>
       <div class="stat-pill">
         <span class="status-indicator live"></span>
-        <span>Сервер: <strong id="server-status">ОНЛАЙН</strong></span>
+        <span>Система: <strong id="server-status">ОНЛАЙН</strong></span>
       </div>
       <div class="stat-pill">
-        <span>Станций: <strong id="stat-stations">5</strong></span>
+        <span>📡 Буев: <strong id="stat-stations">5</strong></span>
       </div>
       <div class="stat-pill alert-pill">
-        <span>Активных тревог: <strong id="stat-alerts">0</strong></span>
+        <span>🚨 Тревог: <strong id="stat-alerts">0</strong></span>
       </div>
       <button class="btn btn-sm btn-outline" onclick="refreshAllData()">🔄 Обновить</button>
     </div>
@@ -43,6 +50,7 @@
         <div class="card-header">
           <div class="card-title">
             <span>🗺️ Геоинформационная карта постов ООПТ (Дельта Волги и Каспий)</span>
+            <span class="hud-coords-badge">🧭 45°20'N, 48°00'E</span>
           </div>
           <div class="map-legend">
             <span class="legend-item"><span class="dot dot-normal"></span> Штатно</span>

@@ -8,6 +8,7 @@ let currentStationId = 1;
 let currentAlertFilterResolved = false;
 
 document.addEventListener("DOMContentLoaded", () => {
+  startLiveCaspianClock();
   initMap();
   refreshAllData();
   loadRecordingDevices();
@@ -19,6 +20,27 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAlerts(currentAlertFilterResolved);
   }, 30000);
 });
+
+function startLiveCaspianClock() {
+  const clockEl = document.getElementById("live-caspian-clock");
+  if (!clockEl) return;
+  const update = () => {
+    const now = new Date();
+    // Caspian / Astrakhan time is UTC+4 (MSK+1)
+    const options = {
+      timeZone: "Europe/Samara",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    };
+    clockEl.textContent = now.toLocaleString("ru-RU", options);
+  };
+  update();
+  setInterval(update, 1000);
+}
 
 // ==========================================
 // 1. Инициализация и работа с картой (Leaflet)
@@ -33,9 +55,11 @@ function initMap() {
   // Центрирование на дельту Волги и Северный Каспий
   mapInstance = L.map("map").setView([45.2, 48.0], 7);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Высокотехнологичная темная морская подложка CartoDB Dark Matter
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 18,
-    attribution: "© OpenStreetMap ООПТ Каспий"
+    subdomains: "abcd",
+    attribution: "© OpenStreetMap © CARTO | Ситуационный Центр ООПТ Каспий"
   }).addTo(mapInstance);
 
   initSealMigrationLayer();
@@ -60,22 +84,22 @@ function initSealMigrationLayer() {
   ];
 
   const sealPolyline = L.polyline(sealPathCoords, {
-    color: "#38bdf8",
-    weight: 4,
-    opacity: 0.85,
+    color: "#00f2fe",
+    weight: 3,
+    opacity: 0.9,
     dashArray: "8, 8",
     lineJoin: "round"
   });
 
   sealPolyline.bindPopup(`
-    <div style="font-family: sans-serif; min-width: 220px; color: #0f172a;">
-      <h4 style="margin: 0 0 4px 0; color: #0284c7;">🦭 Миграционный коридор каспийского тюленя (Pusa caspica)</h4>
-      <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">Эндемик Каспия • Красная книга РФ • МСОП (Endangered)</div>
-      <div style="font-size: 12px; line-height: 1.4;">
-        <strong>Сезон:</strong> Октябрь — Декабрь<br/>
-        <strong>Цель миграции:</strong> Выход на ледовые поля Северного Каспия для размножения и линьки.<br/>
-        <strong>Ключевая угроза:</strong> Запутывание в браконьерских крупноячеистых сетях и столкновения с байдами.<br/>
-        <strong>Защита:</strong> Акустический дозор буев №5 (о. Тюлений) и №3 (ВКМСК).
+    <div class="tactical-popup">
+      <div class="tp-title" style="color: #00f2fe;">🦭 Миграционный коридор каспийского тюленя</div>
+      <div class="tp-sub">Pusa caspica • Красная книга РФ • МСОП (Endangered)</div>
+      <div style="font-size: 12px; line-height: 1.45; color: var(--text-secondary);">
+        <p style="margin: 0 0 6px 0;"><strong style="color: #fff;">Сезон:</strong> Октябрь — Декабрь</p>
+        <p style="margin: 0 0 6px 0;"><strong style="color: #fff;">Маршрут:</strong> Из глубоководного Среднего Каспия (Дербент) через о. Тюлений на ледовые поля Северного Каспия для размножения и линьки.</p>
+        <p style="margin: 0 0 6px 0;"><strong style="color: #f43f5e;">Угрозы:</strong> Браконьерские сети и скоростные байды на ВКМСК.</p>
+        <p style="margin: 0;"><strong style="color: #10b981;">Мониторинг:</strong> Акустический дозор буев DEV-TUL-05 и DEV-VKMSK-03.</p>
       </div>
     </div>
   `);
@@ -128,7 +152,7 @@ function toggleSealMigrationLayer() {
 }
 
 function getMarkerColor(status) {
-  if (status === "CRITICAL") return "#ef4444";
+  if (status === "CRITICAL") return "#f43f5e";
   if (status === "WARNING") return "#f59e0b";
   return "#10b981";
 }
@@ -139,25 +163,29 @@ function renderMapMarkers(stations) {
   stations.forEach(st => {
     const color = getMarkerColor(st.status);
     const customIcon = L.divIcon({
-      className: "custom-pin",
-      html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px ${color};"></div>`,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
+      className: "custom-sonar-pin",
+      html: `
+        <div class="sonar-marker-wrap">
+          <div class="sonar-ring" style="border-color: ${color}; box-shadow: 0 0 10px ${color};"></div>
+          <div class="sonar-core" style="background-color: ${color}; box-shadow: 0 0 10px ${color};"></div>
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
     });
 
     const popupContent = `
-      <div style="font-family: sans-serif; min-width: 180px; color: #1e293b;">
-        <h4 style="margin: 0 0 4px 0; color: #0f172a;">${st.name}</h4>
-        <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">${st.territory}</div>
-        <div style="font-size: 12px; line-height: 1.5;">
-          <strong>Статус:</strong> <span style="color: ${color}; font-weight: bold;">${st.status}</span><br/>
-          <strong>Кислород O₂:</strong> ${st.latestTelemetry?.dissolvedOxygenMgL != null ? st.latestTelemetry.dissolvedOxygenMgL + " мг/л" : "—"}<br/>
-          <strong>Температура:</strong> ${st.latestTelemetry?.temperatureC != null ? st.latestTelemetry.temperatureC + " °C" : "—"}<br/>
-          <strong>Солёность:</strong> ${st.latestTelemetry?.salinityPpt != null ? st.latestTelemetry.salinityPpt + " ‰" : "—"}<br/>
-          <strong>Уровень:</strong> ${st.latestTelemetry?.waterLevelCm != null ? st.latestTelemetry.waterLevelCm + " см" : "—"}
+      <div class="tactical-popup">
+        <div class="tp-title">${st.name}</div>
+        <div class="tp-sub">${st.territory}</div>
+        <div class="tp-metrics">
+          <div class="tp-row"><span>Статус:</span><strong style="color: ${color}; font-weight: 700;">${st.status}</strong></div>
+          <div class="tp-row"><span>Кислород O₂:</span><strong>${st.latestTelemetry?.dissolvedOxygenMgL != null ? st.latestTelemetry.dissolvedOxygenMgL + " мг/л" : "—"}</strong></div>
+          <div class="tp-row"><span>Температура:</span><strong>${st.latestTelemetry?.temperatureC != null ? st.latestTelemetry.temperatureC + " °C" : "—"}</strong></div>
+          <div class="tp-row"><span>Солёность:</span><strong>${st.latestTelemetry?.salinityPpt != null ? st.latestTelemetry.salinityPpt + " ‰" : "—"}</strong></div>
+          <div class="tp-row"><span>Уровень моря:</span><strong>${st.latestTelemetry?.waterLevelCm != null ? st.latestTelemetry.waterLevelCm + " см" : "—"}</strong></div>
         </div>
-        <button style="margin-top: 8px; width: 100%; padding: 4px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;" 
-                onclick="selectStationAndChart(${st.id})">📊 Показать график</button>
+        <button class="tp-btn" onclick="selectStationAndChart(${st.id})">📊 Показать график</button>
       </div>
     `;
 
@@ -919,12 +947,21 @@ function applyPreset(type) {
 // ==========================================
 // 8. Общие утилиты
 // ==========================================
-function switchTab(tabId) {
+function switchTab(tabId, btnElement) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
-  event.target.classList.add("active");
-  document.getElementById(tabId).classList.add("active");
+  if (btnElement) {
+    btnElement.classList.add("active");
+  } else if (window.event && window.event.target) {
+    const target = window.event.target.closest(".tab-btn") || window.event.target;
+    target.classList.add("active");
+  }
+
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) {
+    targetTab.classList.add("active");
+  }
 
   if (tabId === "tab-forecast") {
     loadForecast();

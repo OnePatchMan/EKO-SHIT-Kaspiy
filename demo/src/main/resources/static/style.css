@@ -1,20 +1,59 @@
+/* ==========================================================================
+   ЭКО-ЩИТ КАСПИЯ — СИТУАЦИОННЫЙ ЦЕНТР ООПТ
+   Дизайн-система: Deep Abyssal Cyber-Marine Tactical Ops HUD
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 :root {
-  --bg-primary: #0b132b;
-  --bg-secondary: #1c2541;
-  --bg-card: #1f2a48;
-  --bg-hover: #2a375e;
-  --border-color: #334268;
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --accent-blue: #38bdf8;
-  --accent-cyan: #06b6d4;
-  --color-normal: #10b981;
-  --color-warning: #f59e0b;
-  --color-critical: #ef4444;
-  --color-info: #3b82f6;
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Базовая морская палитра глубин */
+  --bg-abyss: #030712;
+  --bg-surface: rgba(9, 18, 36, 0.78);
+  --bg-surface-elevated: rgba(14, 27, 52, 0.85);
+  --bg-surface-hover: rgba(22, 40, 75, 0.9);
+  --bg-card-inner: rgba(6, 13, 27, 0.65);
+
+  /* Высокоточные неоновые границы */
+  --border-subtle: rgba(56, 189, 248, 0.14);
+  --border-highlight: rgba(56, 189, 248, 0.35);
+  --border-glow: rgba(0, 242, 254, 0.55);
+
+  /* Цветовые маркеры и неон */
+  --neon-cyan: #00f2fe;
+  --neon-blue: #38bdf8;
+  --neon-emerald: #10b981;
+  --neon-emerald-glow: rgba(16, 185, 129, 0.4);
+  --neon-amber: #f59e0b;
+  --neon-amber-glow: rgba(245, 158, 11, 0.4);
+  --neon-crimson: #ff3366;
+  --neon-crimson-glow: rgba(255, 51, 102, 0.4);
+  --neon-ice: #67e8f9;
+
+  /* Типографика */
+  --text-main: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-cyan: #38bdf8;
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Space Grotesk', var(--font-sans);
+
+  /* Совместимость с компонентами */
+  --color-normal: var(--neon-emerald);
+  --color-warning: var(--neon-amber);
+  --color-critical: var(--neon-crimson);
+  --color-info: var(--neon-blue);
+  --accent-cyan: var(--neon-cyan);
+  --accent-blue: var(--neon-blue);
+  --bg-card: var(--bg-surface);
+  --bg-secondary: var(--bg-surface-elevated);
+  --border-color: var(--border-subtle);
 }
 
+/* ==========================================================================
+   Базовые сбросы и фон страницы
+   ========================================================================== */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -22,46 +61,139 @@
 }
 
 body {
-  background-color: var(--bg-primary);
+  background-color: var(--bg-abyss);
   color: var(--text-main);
-  font-family: var(--font-family);
+  font-family: var(--font-sans);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 12% 18%, rgba(6, 182, 212, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 88% 82%, rgba(16, 185, 129, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.05) 0%, transparent 60%),
+    radial-gradient(rgba(56, 189, 248, 0.09) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px;
+  background-attachment: fixed;
 }
 
-/* Header */
+/* Красивый скроллбар */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(3, 7, 18, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 254, 0.45);
+}
+
+/* ==========================================================================
+   Header: Тактический командный бар ситуационного центра
+   ========================================================================== */
 .header {
-  background-color: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  padding: 12px 24px;
+  background: rgba(6, 13, 27, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(56, 189, 248, 0.1);
 }
 
 .header-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .logo-shield {
-  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%);
+  border: 1px solid var(--border-highlight);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.2), inset 0 0 10px rgba(56, 189, 248, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.logo-shield::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.15) 50%, transparent 60%);
+  animation: shine-sweep 6s infinite linear;
+}
+
+@keyframes shine-sweep {
+  0% { transform: translateY(-100%) rotate(45deg); }
+  20%, 100% { transform: translateY(100%) rotate(45deg); }
 }
 
 .header-title {
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  background: linear-gradient(135deg, #ffffff 30%, #38bdf8 80%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-title-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--text-main);
+  letter-spacing: 1px;
+  color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  -webkit-text-fill-color: var(--neon-cyan);
 }
 
 .header-subtitle {
   font-size: 12px;
-  color: var(--accent-cyan);
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-subtitle span.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+  display: inline-block;
 }
 
 .header-stats {
@@ -72,173 +204,471 @@ body {
 }
 
 .stat-pill {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
+  background: rgba(10, 22, 44, 0.7);
+  border: 1px solid var(--border-subtle);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  color: var(--text-secondary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: all 0.25s ease;
+}
+
+.stat-pill strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.stat-pill:hover {
+  border-color: var(--border-highlight);
+  background: rgba(14, 30, 60, 0.85);
+  transform: translateY(-1px);
+}
+
+.stat-pill.clock-pill {
+  border-color: rgba(56, 189, 248, 0.25);
+  color: var(--neon-blue);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.clock-val {
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .stat-pill.alert-pill {
-  border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(255, 51, 102, 0.35);
+  background: rgba(255, 51, 102, 0.08);
+  color: #fca5a5;
+}
+
+.stat-pill.alert-pill strong {
+  color: var(--neon-crimson);
 }
 
 .status-indicator.live {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--color-normal);
-  box-shadow: 0 0 8px var(--color-normal);
-  animation: pulse 2s infinite;
+  background-color: var(--neon-emerald);
+  box-shadow: 0 0 10px var(--neon-emerald);
+  animation: pulse-beacon 2s infinite;
 }
 
-@keyframes pulse {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes pulse-beacon {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 4px var(--neon-emerald); }
+  50% { transform: scale(1.2); opacity: 0.6; box-shadow: 0 0 14px var(--neon-emerald); }
+  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 4px var(--neon-emerald); }
 }
 
-/* Main Container Grid */
+/* ==========================================================================
+   Кнопки и управляющие элементы
+   ========================================================================== */
+.btn {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #0891b2 100%);
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.55);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(15, 30, 58, 0.9);
+  color: var(--neon-blue);
+  border: 1px solid var(--border-highlight);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgba(24, 48, 92, 0.95);
+  border-color: var(--neon-cyan);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+}
+
+.btn-outline {
+  background: rgba(6, 13, 27, 0.6);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-outline:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.08);
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.btn-xs {
+  padding: 4px 9px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+/* ==========================================================================
+   Основная сетка панелей
+   ========================================================================== */
 .main-container {
-  padding: 16px 24px;
+  padding: 20px 28px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   flex: 1;
+  max-width: 1720px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .grid-top, .grid-bottom {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 20px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .grid-top, .grid-bottom {
     grid-template-columns: 1fr;
   }
 }
 
-/* Cards */
+/* ==========================================================================
+   Карточки с тактическим стеклянным HUD-стилем
+   ========================================================================== */
 .card {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  background: var(--bg-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover {
+  border-color: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .card-header {
-  padding: 12px 16px;
-  background-color: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid var(--border-color);
+  padding: 14px 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(0, 0, 0, 0.2) 100%);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .card-title {
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-main);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Map */
+/* ==========================================================================
+   Карта (Leaflet Map): Морской ситуационный дисплей
+   ========================================================================== */
+.map-card {
+  position: relative;
+}
+
 .map-view {
-  height: 380px;
+  height: 420px;
   width: 100%;
-  background-color: #0d1b2a;
+  background-color: #050b14;
+}
+
+/* Тактические сонарные маркеры на карте */
+.custom-sonar-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.sonar-marker-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sonar-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  z-index: 2;
+}
+
+.sonar-ring {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  animation: sonar-radar-pulse 2.2s infinite ease-out;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+@keyframes sonar-radar-pulse {
+  0% { transform: scale(0.4); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Стилизация тайлов карты под глубокое синее море */
+.map-view .leaflet-tile {
+  filter: brightness(0.88) contrast(1.15) saturate(1.2);
 }
 
 .map-legend {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   display: inline-block;
 }
 
+.dot-normal { background-color: var(--neon-emerald); box-shadow: 0 0 8px var(--neon-emerald-glow); }
+.dot-warning { background-color: var(--neon-amber); box-shadow: 0 0 8px var(--neon-amber-glow); }
+.dot-critical { background-color: var(--neon-crimson); box-shadow: 0 0 8px var(--neon-crimson-glow); }
+
 .btn-seal-layer {
-  margin-left: 6px;
-  background: rgba(56, 189, 248, 0.15);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: var(--neon-cyan);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
   cursor: pointer;
-  border-radius: 4px;
   transition: all 0.2s ease;
 }
 
 .btn-seal-layer.active {
-  background: #0284c7;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.8) 0%, rgba(6, 182, 212, 0.8) 100%);
   color: white;
-  box-shadow: 0 0 8px rgba(14, 165, 233, 0.4);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.4);
 }
 
-.dot-normal { background-color: var(--color-normal); }
-.dot-warning { background-color: var(--color-warning); }
-.dot-critical { background-color: var(--color-critical); }
+/* Координатная плашка на карте */
+.hud-coords-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--neon-cyan);
+  background: rgba(6, 13, 27, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
 
-/* Alerts Feed */
+/* Темные тактические всплывающие окна Leaflet */
+.leaflet-popup-content-wrapper {
+  background: rgba(6, 13, 27, 0.95) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-highlight) !important;
+  border-radius: 10px !important;
+  backdrop-filter: blur(14px) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(6, 13, 27, 0.95) !important;
+  border: 1px solid var(--border-highlight) !important;
+}
+
+.tactical-popup {
+  font-family: var(--font-sans);
+  min-width: 200px;
+  padding: 4px 2px;
+}
+
+.tp-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.tp-sub {
+  font-size: 11px;
+  color: var(--neon-cyan);
+  margin-bottom: 8px;
+}
+
+.tp-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.tp-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 2px;
+}
+
+.tp-row span {
+  color: var(--text-secondary);
+}
+
+.tp-btn {
+  width: 100%;
+  padding: 6px;
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* Анимированный коридор тюленей */
+.seal-animated-corridor {
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.8));
+}
+
+/* ==========================================================================
+   Лента оперативных алертов
+   ========================================================================== */
 .alerts-card {
-  max-height: 440px;
+  max-height: 480px;
+}
+
+.filter-group {
+  display: flex;
+  background: rgba(4, 9, 20, 0.7);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  gap: 4px;
+}
+
+.btn-filter {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-filter.active {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
 }
 
 .alerts-feed {
-  padding: 12px;
+  padding: 16px;
   overflow-y: auto;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .alert-item {
-  background-color: var(--bg-card);
-  border-left: 4px solid var(--border-color);
-  padding: 12px;
-  border-radius: 6px;
+  background: rgba(8, 17, 36, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--border-subtle);
+  padding: 14px 16px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  transition: transform 0.15s ease, background 0.15s ease;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .alert-item:hover {
-  background-color: var(--bg-hover);
+  background: rgba(14, 28, 56, 0.85);
+  border-color: rgba(56, 189, 248, 0.35);
+  transform: translateX(3px);
 }
 
 .alert-item.severity-CRITICAL {
-  border-left-color: var(--color-critical);
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(31, 42, 72, 0.7));
+  border-left-color: var(--neon-crimson);
+  background: linear-gradient(90deg, rgba(255, 51, 102, 0.12) 0%, rgba(8, 17, 36, 0.75) 100%);
+  border-color: rgba(255, 51, 102, 0.3);
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.15);
 }
 
 .alert-item.severity-WARNING {
-  border-left-color: var(--color-warning);
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(31, 42, 72, 0.7));
+  border-left-color: var(--neon-amber);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, rgba(8, 17, 36, 0.75) 100%);
+  border-color: rgba(245, 158, 11, 0.25);
 }
 
 .alert-item.severity-INFO {
-  border-left-color: var(--color-info);
+  border-left-color: var(--neon-blue);
 }
 
 .alert-header {
@@ -249,29 +679,49 @@ body {
 }
 
 .alert-badge {
+  font-family: var(--font-mono);
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
   font-size: 11px;
+  letter-spacing: 0.5px;
 }
 
-.badge-critical { background-color: var(--color-critical); color: white; }
-.badge-warning { background-color: var(--color-warning); color: #1e293b; }
-.badge-info { background-color: var(--color-info); color: white; }
+.badge-critical { 
+  background-color: rgba(255, 51, 102, 0.2); 
+  color: #ff6b8b; 
+  border: 1px solid rgba(255, 51, 102, 0.5); 
+}
+
+.badge-warning { 
+  background-color: rgba(245, 158, 11, 0.2); 
+  color: #fcd34d; 
+  border: 1px solid rgba(245, 158, 11, 0.5); 
+}
+
+.badge-info { 
+  background-color: rgba(56, 189, 248, 0.2); 
+  color: #7dd3fc; 
+  border: 1px solid rgba(56, 189, 248, 0.4); 
+}
 
 .alert-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .alert-msg {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
+  color: var(--text-main);
 }
 
 .alert-details {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .alert-footer {
@@ -279,336 +729,276 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
 }
 
 .alert-station {
   font-size: 11px;
-  color: var(--accent-cyan);
+  font-weight: 600;
+  color: var(--neon-cyan);
 }
 
-/* Charts */
+/* ==========================================================================
+   Графики гидрологической телеметрии
+   ========================================================================== */
 .chart-card {
-  min-height: 380px;
+  min-height: 420px;
+}
+
+.select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.select-wrapper select,
+.form-group select,
+.form-row select {
+  background: rgba(6, 13, 27, 0.85);
+  border: 1px solid var(--border-highlight);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-family: var(--font-sans);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.select-wrapper select:focus,
+.form-group select:focus,
+.form-row select:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
 }
 
 .chart-container {
-  padding: 16px;
+  padding: 20px;
   flex: 1;
   position: relative;
-  height: 320px;
+  height: 340px;
 }
 
-/* Tabs & Tools Card */
+/* ==========================================================================
+   Вкладки модулей (Табы)
+   ========================================================================== */
 .tools-card {
-  min-height: 380px;
+  min-height: 420px;
 }
 
 .tabs-nav {
   display: flex;
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
+  background: rgba(4, 9, 20, 0.85);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  gap: 8px;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 12px 10px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
   font-size: 13px;
   font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-btn:hover {
   color: var(--text-main);
-  background-color: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tab-btn.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
-  background-color: var(--bg-secondary);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
 }
 
 .tab-content {
   display: none;
-  padding: 16px;
+  padding: 20px;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   flex: 1;
+  overflow-y: auto;
 }
 
 .tab-content.active {
   display: flex;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .tab-heading {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--accent-blue);
-}
-
-.tab-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-/* Field Hydrophone Devices & Acoustic Panel */
-.tab-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 4px;
-}
-
-/* Sentry Banner & Autonomous Toggle */
-.sentry-banner {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.1), rgba(15, 23, 42, 0.8));
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 4px;
-}
-
-.sentry-toggle-group {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.sentry-active-title {
-  font-size: 13px;
-  color: var(--text-main);
-}
-
-.sentry-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.switch-container {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.switch-container input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switch-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #334155;
-  transition: .3s;
-  border-radius: 24px;
-  border: 1px solid var(--border-color);
-}
-
-.switch-slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .3s;
-  border-radius: 50%;
-}
-
-input:checked + .switch-slider {
-  background-color: #10b981;
-}
-
-input:checked + .switch-slider:before {
-  transform: translateX(20px);
-}
-
-.device-panel {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.device-select-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.device-select-bar label {
-  font-size: 12px;
-  color: var(--accent-cyan);
-}
-
-.device-select-bar select {
-  width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.device-telemetry-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
 }
 
-.telemetry-pill {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(51, 65, 85, 0.7);
-  border-radius: 6px;
-  padding: 6px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.tab-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 3px;
 }
 
-.tp-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-
-.tp-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-main);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.text-online {
-  color: var(--color-normal);
-}
-
-.text-standby {
-  color: var(--color-warning);
-}
-
-/* Scenarios & Quick Tests */
+/* ==========================================================================
+   Акустический ИИ: Тактические кнопки звуковых сэмплов
+   ========================================================================== */
 .capture-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: rgba(30, 41, 59, 0.35);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px;
 }
 
 .scenario-title {
+  font-family: var(--font-display);
   font-size: 13px;
-  color: var(--accent-cyan);
-  display: block;
-}
-
-.quick-test-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
-}
-
-.btn-test-action {
+  font-weight: 700;
+  color: var(--text-main);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  background: rgba(15, 23, 42, 0.85);
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s ease;
-}
-
-.btn-test-action:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.btn-boat { border-left: 4px solid #f59e0b; }
-.btn-boat:hover { background: rgba(245, 158, 11, 0.18); border-color: #f59e0b; }
-
-.btn-shot { border-left: 4px solid #ef4444; }
-.btn-shot:hover { background: rgba(239, 68, 68, 0.18); border-color: #ef4444; }
-
-.btn-fish { border-left: 4px solid #38bdf8; }
-.btn-fish:hover { background: rgba(56, 189, 248, 0.18); border-color: #38bdf8; }
-
-.btn-ambient { border-left: 4px solid #10b981; }
-.btn-ambient:hover { background: rgba(16, 185, 129, 0.18); border-color: #10b981; }
-
-.btn-icon { font-size: 22px; flex-shrink: 0; }
-.btn-text-wrap strong { display: block; font-size: 12px; color: var(--text-main); }
-.btn-text-wrap small { font-size: 10px; color: var(--text-muted); }
-
-.scenario-pills {
-  display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
-.btn-scen {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid var(--border-color);
+.form-hint {
+  font-size: 12px;
   color: var(--text-muted);
-  padding: 5px 10px;
-  font-size: 11px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.btn-scen:hover {
-  background: var(--bg-hover);
+/* 4 Тактические карточки событий */
+.quick-test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .quick-test-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.btn-test-action {
+  padding: 12px 14px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  background: rgba(8, 17, 36, 0.7);
   color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
 }
 
-.btn-scen.active {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
-  font-weight: 600;
+.btn-test-action .btn-icon {
+  font-size: 24px;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
+  transition: transform 0.2s ease;
 }
 
-.btn-capture {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+.btn-test-action:hover .btn-icon {
+  transform: scale(1.15);
 }
 
-/* Live Stream Panel */
-.live-stream-panel {
-  background: #090e1a;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 8px;
-  padding: 10px 12px;
+.btn-text-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
+}
+
+.btn-text-wrap strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.btn-text-wrap small {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Мотор лодки (Байда) — Неоновый оранжевый */
+.btn-test-action.btn-boat {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(8, 17, 36, 0.8) 100%);
+}
+.btn-test-action.btn-boat:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Оружейный выстрел — Неоновый алый */
+.btn-test-action.btn-shot {
+  border-color: rgba(255, 51, 102, 0.35);
+  background: linear-gradient(135deg, rgba(255, 51, 102, 0.08) 0%, rgba(8, 17, 36, 0.8) 100%);
+}
+.btn-test-action.btn-shot:hover {
+  border-color: #ff3366;
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Плеск рыбы — Биолюминесцентный изумруд */
+.btn-test-action.btn-fish {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(8, 17, 36, 0.8) 100%);
+}
+.btn-test-action.btn-fish:hover {
+  border-color: #10b981;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Шум волн Каспия — Морской лазурный */
+.btn-test-action.btn-ambient {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(8, 17, 36, 0.8) 100%);
+}
+.btn-test-action.btn-ambient:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Сонарный аудиоплеер и спектрограмма
+   ========================================================================== */
+.live-stream-panel {
+  background: rgba(6, 13, 27, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .stream-bar {
@@ -616,284 +1006,238 @@ input:checked + .switch-slider:before {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .stream-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-}
-
-.live-indicator {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #ef4444;
-}
-
-.blink-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #ef4444;
-  border-radius: 50%;
-  animation: pulse-red 1.2s infinite;
-}
-
-@keyframes pulse-red {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1); }
+  font-size: 13px;
 }
 
 .stream-dev-name {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .spectrum-canvas {
   width: 100%;
   height: 40px;
-  background: #050811;
-  border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.15);
+  background: #040812;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 6px;
+  display: block;
 }
 
-/* Aux row (Mic + Manual upload) */
+/* Стилизация HTML5 audio controls */
+audio#device-audio-player {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  outline: none;
+  filter: invert(90%) hue-rotate(180deg) brightness(1.2);
+}
+
+/* ==========================================================================
+   Загрузка файлов и карточка результатов ИИ
+   ========================================================================== */
 .aux-audio-row {
+  background: rgba(6, 13, 27, 0.6);
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  padding: 14px;
+  border-radius: 10px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
-  font-size: 12px;
+  transition: border-color 0.2s ease;
 }
 
-.mic-hint {
-  font-size: 11px;
-  color: var(--accent-cyan);
-}
-
-.manual-upload-details {
-  font-size: 11px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.manual-upload-details summary {
-  user-select: none;
+.aux-audio-row:hover {
+  border-color: var(--neon-cyan);
 }
 
 .manual-upload-box {
-  margin-top: 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.file-input {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.file-input::file-selector-button {
+  background: rgba(15, 30, 60, 0.9);
+  color: var(--neon-cyan);
+  border: 1px solid var(--border-highlight);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  margin-right: 10px;
+}
+
+.file-input::file-selector-button:hover {
+  background: rgba(2, 132, 199, 0.3);
+  border-color: var(--neon-cyan);
 }
 
 .file-preview-banner {
-  margin-top: 6px;
-  padding: 6px 10px;
-  background: rgba(56, 189, 248, 0.15);
-  border-left: 3px solid var(--accent-blue);
-  border-radius: 4px;
-  font-size: 11px;
-  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--neon-cyan);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.btn-xs {
-  font-size: 10px;
-  padding: 2px 6px;
-  margin-left: 4px;
+.result-box {
+  background: rgba(6, 13, 27, 0.92);
+  border: 1px solid var(--border-highlight);
+  padding: 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: fadeIn 0.25s ease-out;
 }
 
-/* Forecast Card */
+/* ==========================================================================
+   Вкладка: Прогноз миграции тюленей и нереста
+   ========================================================================== */
 .forecast-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .form-row label {
   font-size: 12px;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .forecast-result {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: rgba(6, 13, 27, 0.85);
+  border: 1px solid var(--border-highlight);
+  border-radius: 10px;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .forecast-gauge {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .gauge-circle {
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--color-normal);
-  padding: 10px;
-  background-color: rgba(16, 185, 129, 0.1);
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  width: 76px;
-  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 800;
+  color: white;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
 }
 
 .gauge-details {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .recommendation-box {
-  background-color: rgba(56, 189, 248, 0.1);
-  border-left: 3px solid var(--accent-blue);
-  padding: 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.4;
+  background: rgba(2, 132, 199, 0.1);
+  border-left: 3px solid var(--neon-cyan);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-main);
 }
 
-/* Forms */
+/* ==========================================================================
+   Вкладка: Симулятор датчиков IoT
+   ========================================================================== */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
 }
 
 .form-group label {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
-.form-hint {
-  font-size: 10px;
-  color: #64748b;
+.form-group input {
+  background: rgba(6, 13, 27, 0.85);
+  border: 1px solid var(--border-highlight);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
 }
 
 .form-actions-full {
-  grid-column: 1 / -1;
+  grid-column: span 2;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-top: 6px;
 }
 
-select, input {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 13px;
-}
-
-select:focus, input:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-}
-
-/* Buttons */
-.btn {
-  background-color: var(--bg-card);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-  padding: 7px 14px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn:hover {
-  background-color: var(--bg-hover);
-}
-
-.btn-primary {
-  background-color: #2563eb;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1d4ed8;
-}
-
-.btn-outline {
-  background-color: transparent;
-  border-color: var(--border-color);
-}
-
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 11px;
-}
-
-.btn-preset {
-  background-color: rgba(255, 255, 255, 0.05);
-  font-size: 11px;
-}
-
-.btn-filter {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.btn-filter.active {
-  background-color: var(--accent-blue);
-  color: #0b132b;
-  font-weight: 700;
-}
-
-/* Result Box */
-.result-box {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
+/* ==========================================================================
+   Утилиты и заглушки
+   ========================================================================== */
 .hidden {
   display: none !important;
 }
 
 .loading-placeholder {
-  color: var(--text-muted);
-  text-align: center;
   padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
   font-size: 13px;
+  font-family: var(--font-mono);
 }
-
