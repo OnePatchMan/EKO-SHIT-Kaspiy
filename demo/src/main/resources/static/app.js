@@ -691,7 +691,64 @@ async function toggleMicRecording() {
   }
 }
 
-// Fallback file upload from disk
+// Fallback file upload from disk & Live Audio Preview
+let filePreviewAudio = null;
+
+function onAudioFileSelected(input) {
+  const banner = document.getElementById("file-preview-banner");
+  if (!input.files || input.files.length === 0) return;
+
+  const file = input.files[0];
+  if (banner) {
+    banner.classList.remove("hidden");
+    banner.innerHTML = `🔊 <strong>${escapeHtml(file.name)}</strong>: выбран, воспроизведение образца...`;
+  }
+
+  // Play subtle feedback chirp
+  playSubtleFeedbackChirp();
+
+  if (filePreviewAudio) {
+    filePreviewAudio.pause();
+    filePreviewAudio = null;
+  }
+
+  const audioUrl = URL.createObjectURL(file);
+  filePreviewAudio = new Audio(audioUrl);
+  filePreviewAudio.volume = 0.55;
+  filePreviewAudio.play().then(() => {
+    startVisualizerCanvas();
+  }).catch(e => {
+    console.log("Audio preview autoplay:", e);
+  });
+
+  filePreviewAudio.onended = () => {
+    stopVisualizerCanvas();
+  };
+}
+
+function playSubtleFeedbackChirp() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  } catch (err) {}
+}
+
 async function uploadAudio() {
   const fileInput = document.getElementById("audio-file-input");
   const resultBox = document.getElementById("audio-result");
@@ -747,7 +804,7 @@ function displayAudioResult(data, audioUrl = null) {
     </div>
     ${audioUrl ? `
       <div style="margin-bottom: 8px;">
-        <audio controls src="${audioUrl}" style="width: 100%; height: 32px;"></audio>
+        <audio id="result-audio-player" controls autoplay src="${audioUrl}" style="width: 100%; height: 32px;" onplay="startVisualizerCanvas()" onpause="stopVisualizerCanvas()"></audio>
       </div>
     ` : ''}
     <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
@@ -756,6 +813,14 @@ function displayAudioResult(data, audioUrl = null) {
       ${data.alertGenerated ? `<span style="color: #ef4444; font-weight: bold;">🚨 Сформировано оперативное предупреждение инспекции на карте!</span>` : `<span style="color: #10b981;">✓ Браконьерская угроза отсутствует. Акватория чиста.</span>`}
     </div>
   `;
+
+  if (audioUrl) {
+    const audioEl = document.getElementById("result-audio-player");
+    if (audioEl) {
+      audioEl.volume = 0.6;
+      audioEl.play().catch(e => console.log("Result autoplay:", e));
+    }
+  }
 }
 
 // ==========================================

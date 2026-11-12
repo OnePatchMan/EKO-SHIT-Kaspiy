@@ -694,6 +694,16 @@ input:checked + .switch-slider:before {
   gap: 6px;
 }
 
+.file-preview-banner {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(56, 189, 248, 0.15);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--accent-cyan);
+}
+
 .btn-xs {
   font-size: 10px;
   padding: 2px 6px;

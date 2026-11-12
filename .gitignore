@@ -15,6 +15,10 @@ demo/target/
 uploads/
 demo/uploads/
 
+# Python cache
+__pycache__/
+*.pyc
+
 # IDE files
 .idea/
 *.iml

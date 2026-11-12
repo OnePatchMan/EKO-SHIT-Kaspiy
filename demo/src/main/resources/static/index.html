@@ -223,9 +223,10 @@
             <details class="manual-upload-details">
               <summary>📁 Архивные оффлайн-записи (.wav)</summary>
               <div class="manual-upload-box">
-                <input type="file" id="audio-file-input" accept="audio/*" class="file-input">
+                <input type="file" id="audio-file-input" accept="audio/*" class="file-input" onchange="onAudioFileSelected(this)">
                 <button class="btn btn-sm btn-primary" onclick="uploadAudio()">Анализ файла</button>
               </div>
+              <div id="file-preview-banner" class="file-preview-banner hidden"></div>
             </details>
           </div>
 
