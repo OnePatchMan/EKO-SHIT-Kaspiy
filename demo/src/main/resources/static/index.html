@@ -98,7 +98,7 @@
       <!-- Tabs: Audio Hydrophone Devices / Sturgeon Spawning / IoT Injection -->
       <section class="card tools-card">
         <div class="tabs-nav">
-          <button class="tab-btn active" onclick="switchTab('tab-audio')">📡 Гидрофоны ООПТ</button>
+          <button class="tab-btn active" onclick="switchTab('tab-audio')">🎧 Акустический ИИ</button>
           <button class="tab-btn" onclick="switchTab('tab-forecast')">🦭 Миграция тюленей и нерест</button>
           <button class="tab-btn" onclick="switchTab('tab-simulator')">🧪 IoT-Симулятор</button>
         </div>
@@ -106,109 +106,57 @@
         <div class="tab-content active" id="tab-audio">
           <div class="tab-header-row">
             <div>
-              <h3 class="tab-heading">📡 Полевые регистрирующие гидрофоны ООПТ</h3>
-              <p class="tab-desc">Комплекс непрерывного гидроакустического мониторинга заповедных акваторий. Система <strong>автономно распознаёт угрозы</strong> в звуковом потоке без необходимости загружать файлы вручную.</p>
+              <h3 class="tab-heading">🎧 Акустический мониторинг акватории (ИИ-детекция)</h3>
+              <p class="tab-desc">Нейросетевая детекция подвесных моторов лодок («Байда»), оружейных выстрелов, всплесков рыбы и шума моря по гидроакустическим записям.</p>
             </div>
           </div>
 
-          <!-- Mode Banner: Autonomous Sentry vs Manual Testing -->
-          <div class="sentry-banner">
-            <div class="sentry-toggle-group">
-              <label class="switch-container">
-                <input type="checkbox" id="auto-sentry-toggle" onchange="toggleAutonomousMonitoring(this.checked)">
-                <span class="switch-slider"></span>
-              </label>
-              <div>
-                <strong id="sentry-status-label" class="sentry-active-title">🛡️ Автономный дозор: ВЫКЛ (ручной режим проверки)</strong>
-                <div class="sentry-subtitle">Включите для фонового авто-сканирования эфира гидрофонов каждые 12 секунд</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Device Card & Telemetry -->
-          <div class="device-panel">
-            <div class="device-select-bar">
-              <label for="hydrophone-select"><strong>Выбор гидроакустического комплекса ООПТ:</strong></label>
-              <select id="hydrophone-select" onchange="onHydrophoneSelected(this.value)">
-                <option value="DEV-CASP-03">DEV-CASP-03 — Дальнобойный гидрофон ВКМСК-145 (Северный Каспий)</option>
-                <option value="DEV-DAM-01">DEV-DAM-01 — ГАК-Дамчик-1 (Дамчикский участок ООПТ)</option>
-                <option value="DEV-TRE-02">DEV-TRE-02 — БАР-Трёхизбинка-2 (Трёхизбинский участок ООПТ)</option>
-                <option value="DEV-AGR-04">DEV-AGR-04 — Акустический регистратор Кизляр-Аграхан-4 (Дагестанский заповедник)</option>
-                <option value="DEV-TUL-05">DEV-TUL-05 — Шельфовый гидропост МГ-2 (Остров Тюлений)</option>
-              </select>
-            </div>
-
-            <div class="device-telemetry-grid">
-              <div class="telemetry-pill">
-                <span class="tp-label">Статус буя:</span>
-                <span class="tp-val text-online" id="dev-status">● ONLINE</span>
-                <button class="btn btn-xs btn-outline" id="btn-toggle-sentry" onclick="toggleDeviceSentry()" title="Переключить сторожевой режим">Сторож: ВКЛ</button>
-              </div>
-              <div class="telemetry-pill">
-                <span class="tp-label">АКБ буя:</span>
-                <span class="tp-val" id="dev-battery">🔋 91%</span>
-              </div>
-              <div class="telemetry-pill">
-                <span class="tp-label">Канал связи:</span>
-                <span class="tp-val" id="dev-signal">📶 -58 dBm (Иридиум)</span>
-              </div>
-              <div class="telemetry-pill">
-                <span class="tp-label">Модель сенсора:</span>
-                <span class="tp-val" id="dev-model">Teledyne RESON TC4032 Marine</span>
-              </div>
-              <div class="telemetry-pill">
-                <span class="tp-label">Шум акватории:</span>
-                <span class="tp-val" id="dev-noise">🔊 46.5 дБ</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quick Test & Demonstration Panel -->
+          <!-- Sound Samples Library -->
           <div class="capture-section">
-            <span class="scenario-title">🎮 <strong>Пульт ручной проверки и демонстрации для жюри:</strong></span>
-            <p class="form-hint" style="margin-bottom: 8px;">Нажмите кнопку нужного события — система моментально смоделирует появление звука на гидрофоне, выполнит нейросетевой анализ, окрасит карту в тревожный цвет и включит аудиопоток:</p>
+            <span class="scenario-title">🔊 <strong>Библиотека звуковых сэмплов:</strong></span>
+            <p class="form-hint" style="margin-bottom: 8px;">Выберите звук для воспроизведения в аудиоплеере и запуска нейросетевого анализа:</p>
             <div class="quick-test-grid">
-              <button class="btn btn-test-action btn-boat" onclick="triggerDirectTest('boat')">
+              <button class="btn btn-test-action btn-boat" onclick="playAndAnalyzeSound('boat')">
                 <span class="btn-icon">🚤</span>
                 <div class="btn-text-wrap">
-                  <strong>Проверить: Мотор байды</strong>
-                  <small>Детекция браконьера (94% High Threat)</small>
+                  <strong>Мотор лодки («Байда»)</strong>
+                  <small>Звук мотора браконьера</small>
                 </div>
               </button>
-              <button class="btn btn-test-action btn-shot" onclick="triggerDirectTest('shot')">
+              <button class="btn btn-test-action btn-shot" onclick="playAndAnalyzeSound('shot')">
                 <span class="btn-icon">💥</span>
                 <div class="btn-text-wrap">
-                  <strong>Проверить: Выстрел</strong>
-                  <small>Оружейный залп (89% Critical Threat)</small>
+                  <strong>Оружейный выстрел</strong>
+                  <small>Звук выстрела из карабина</small>
                 </div>
               </button>
-              <button class="btn btn-test-action btn-fish" onclick="triggerDirectTest('splash')">
+              <button class="btn btn-test-action btn-fish" onclick="playAndAnalyzeSound('splash')">
                 <span class="btn-icon">🐟</span>
                 <div class="btn-text-wrap">
-                  <strong>Проверить: Плеск рыбы</strong>
-                  <small>Нерестовый ход осетровых (Норма)</small>
+                  <strong>Плеск рыбы</strong>
+                  <small>Всплеск осетровых в воде</small>
                 </div>
               </button>
-              <button class="btn btn-test-action btn-ambient" onclick="triggerDirectTest('ambient')">
+              <button class="btn btn-test-action btn-ambient" onclick="playAndAnalyzeSound('ambient')">
                 <span class="btn-icon">🌊</span>
                 <div class="btn-text-wrap">
-                  <strong>Проверить: Шум волн</strong>
-                  <small>Фоновые волны Каспия (Норма)</small>
+                  <strong>Шум волн Каспия</strong>
+                  <small>Фоновый шум морского прибоя</small>
                 </div>
               </button>
             </div>
           </div>
 
-          <!-- Live Streaming & Audio Visualizer -->
+          <!-- Audio Player & Visualizer -->
           <div class="live-stream-panel">
             <div class="stream-bar">
               <div class="stream-info">
-                <span class="live-indicator"><span class="blink-dot"></span> ПРЯМОЙ ЭФИР С БУЯ</span>
-                <span class="stream-dev-name" id="stream-dev-title">ВКМСК-145 (44.1 кГц, PCM 16-bit)</span>
+                <span class="live-indicator"><span class="blink-dot"></span> АУДИОПЛЕЕР</span>
+                <span class="stream-dev-name" id="stream-dev-title">Выберите звук выше или загрузите аудиофайл</span>
               </div>
               <div class="stream-actions">
-                <button class="btn btn-sm btn-secondary" id="btn-toggle-stream" onclick="toggleDeviceLiveStream()">
-                  ▶ Слушать эфир гидрофона
+                <button class="btn btn-sm btn-secondary" id="btn-toggle-stream" onclick="toggleAudioPlayback()">
+                  ▶ Воспроизвести
                 </button>
               </div>
             </div>
@@ -216,18 +164,23 @@
             <audio id="device-audio-player" style="display: none;"></audio>
           </div>
 
-          <!-- Sea Hydrophones Status & Offline Archive -->
-          <div class="aux-audio-row">
-            <span class="mic-hint">🌊 Режим работы: Прямой цифровой опрос морских донных гидрофонов ООПТ</span>
-
-            <details class="manual-upload-details">
-              <summary>📁 Архивные оффлайн-записи (.wav)</summary>
-              <div class="manual-upload-box">
-                <input type="file" id="audio-file-input" accept="audio/*" class="file-input" onchange="onAudioFileSelected(this)">
-                <button class="btn btn-sm btn-primary" onclick="uploadAudio()">Анализ файла</button>
-              </div>
-              <div id="file-preview-banner" class="file-preview-banner hidden"></div>
-            </details>
+          <!-- Custom File Upload -->
+          <div class="aux-audio-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">
+              📁 Загрузить свою гидроакустическую запись (.wav, .mp3)
+            </div>
+            <div class="manual-upload-box" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+              <input type="file" id="audio-file-input" accept="audio/*" class="file-input" onchange="onAudioFileSelected(this)">
+              <select id="station-select-audio" style="padding: 6px 10px; font-size: 12px; background: rgba(15,23,42,0.9); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; color: #f1f5f9;">
+                <option value="1">Станция ВКМСК-145</option>
+                <option value="2">Дамчикский участок</option>
+                <option value="3">Трёхизбинка</option>
+                <option value="4">Аграханский залив</option>
+                <option value="5">Остров Тюлений</option>
+              </select>
+              <button class="btn btn-sm btn-primary" onclick="uploadAudio()">⚡ Анализ ИИ</button>
+            </div>
+            <div id="file-preview-banner" class="file-preview-banner hidden"></div>
           </div>
 
           <!-- Result Container -->
